@@ -14,7 +14,7 @@
 
 	<groupId>br.rafaeros</groupId>
 	<artifactId>fastrelax-api</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+	<version>1.0.0</version>
 
 	<name>fastrelax-api</name>
 
