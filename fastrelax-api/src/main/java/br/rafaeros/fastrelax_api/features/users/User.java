@@ -49,6 +49,13 @@ public class User implements UserDetails {
     @Column(nullable = false, length = 30)
     private UserRole role;
 
+    /**
+     * Verdadeiro enquanto o usuário ainda usa a senha temporária definida por quem
+     * o cadastrou. Enquanto for verdadeiro, o acesso fica limitado à troca de senha.
+     */
+    @Column(name = "must_change_password", nullable = false)
+    private boolean mustChangePassword = true;
+
     @Column(nullable = false)
     private boolean active = true;
 
