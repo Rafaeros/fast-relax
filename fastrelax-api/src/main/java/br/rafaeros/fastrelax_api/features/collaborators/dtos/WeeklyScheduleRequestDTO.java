@@ -12,7 +12,7 @@ import jakarta.validation.constraints.Size;
  * <p>
  * Days omitted from the list are deactivated, so this defines the collaborator's
  * complete schedule rather than adding to it. A subset is allowed — part-time and
- * shift collaborators do not have lunch configured every weekday.
+ * shift collaborators do not have an allowed window configured every weekday.
  */
 public record WeeklyScheduleRequestDTO(
     @NotEmpty(message = "Informe ao menos um dia da semana")

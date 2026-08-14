@@ -1,7 +1,7 @@
 package br.rafaeros.fastrelax_api.features.collaborators;
 
 /**
- * Business days a collaborator can have a lunch schedule on.
+ * Business days a collaborator can have an allowed session window on.
  *
  * <p>
  * Deliberately not {@link java.time.DayOfWeek}: that enum carries Sunday, which
@@ -10,12 +10,23 @@ package br.rafaeros.fastrelax_api.features.collaborators;
  * types are in scope.
  */
 public enum WorkDay {
-    MONDAY,
-    TUESDAY,
-    WEDNESDAY,
-    THURSDAY,
-    FRIDAY,
-    SATURDAY;
+    MONDAY("Segunda-feira"),
+    TUESDAY("Terça-feira"),
+    WEDNESDAY("Quarta-feira"),
+    THURSDAY("Quinta-feira"),
+    FRIDAY("Sexta-feira"),
+    SATURDAY("Sábado");
+
+    private final String label;
+
+    WorkDay(String label) {
+        this.label = label;
+    }
+
+    /** Texto para exibição; o nome do enum segue sendo o valor trafegado. */
+    public String getLabel() {
+        return label;
+    }
 
     /** Vazio para domingo, único dia sem expediente. */
     public static java.util.Optional<WorkDay> from(java.time.LocalDate date) {

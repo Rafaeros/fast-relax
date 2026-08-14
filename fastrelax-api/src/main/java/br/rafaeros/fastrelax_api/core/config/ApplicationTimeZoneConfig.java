@@ -16,7 +16,7 @@ import jakarta.annotation.PostConstruct;
  * Toda regra de horário do sistema usa {@code LocalDate.now()} e
  * {@code LocalTime.now()}, que leem o fuso do sistema operacional. Em container
  * ou nuvem esse padrão costuma ser UTC, e aí meio-dia em Brasília chega como
- * 15:00 — a janela de almoço rejeitaria agendamentos válidos, o início de sessão
+ * 15:00 — a janela de horário permitido rejeitaria agendamentos válidos, o início de sessão
  * seria recusado e o job expiraria sessões antes da hora.
  */
 @Configuration

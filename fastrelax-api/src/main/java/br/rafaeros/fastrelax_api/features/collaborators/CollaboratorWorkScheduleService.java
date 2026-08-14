@@ -99,7 +99,7 @@ public class CollaboratorWorkScheduleService {
         List<CollaboratorWorkSchedule> saved = new ArrayList<>();
         for (Map.Entry<WorkDay, WorkScheduleItemDTO> entry : requested.entrySet()) {
             WorkScheduleItemDTO item = entry.getValue();
-            validateLunchWindow(item.lunchStartTime(), item.lunchEndTime());
+            validateAllowedWindow(item.allowedStartTime(), item.allowedEndTime());
 
             CollaboratorWorkSchedule schedule = existing.get(entry.getKey());
             if (schedule == null) {
@@ -107,8 +107,8 @@ public class CollaboratorWorkScheduleService {
                 schedule.setCollaborator(collaborator);
                 schedule.setDayOfWeek(entry.getKey());
             }
-            schedule.setLunchStartTime(item.lunchStartTime());
-            schedule.setLunchEndTime(item.lunchEndTime());
+            schedule.setAllowedStartTime(item.allowedStartTime());
+            schedule.setAllowedEndTime(item.allowedEndTime());
             schedule.setActive(true);
             schedule.setDeletedAt(null);
             saved.add(scheduleRepository.save(schedule));
@@ -133,7 +133,7 @@ public class CollaboratorWorkScheduleService {
     public CollaboratorWorkScheduleResponseDTO create(CollaboratorWorkScheduleDTO dto) {
         Collaborator collaborator = collaboratorRepository.findById(Objects.requireNonNull(dto.collaboratorId()))
                 .orElseThrow(() -> new ResourceNotFoundException("Colaborador não encontrado"));
-        validateLunchWindow(dto.lunchStartTime(), dto.lunchEndTime());
+        validateAllowedWindow(dto.allowedStartTime(), dto.allowedEndTime());
 
         CollaboratorWorkSchedule schedule = scheduleRepository
                 .findByCollaboratorIdIncludingDeleted(dto.collaboratorId()).stream()
@@ -153,8 +153,8 @@ public class CollaboratorWorkScheduleService {
             schedule.setDeletedAt(null);
         }
 
-        schedule.setLunchStartTime(dto.lunchStartTime());
-        schedule.setLunchEndTime(dto.lunchEndTime());
+        schedule.setAllowedStartTime(dto.allowedStartTime());
+        schedule.setAllowedEndTime(dto.allowedEndTime());
         schedule.setActive(true);
 
         return new CollaboratorWorkScheduleResponseDTO(scheduleRepository.save(schedule));
@@ -163,15 +163,15 @@ public class CollaboratorWorkScheduleService {
     @Transactional
     public CollaboratorWorkScheduleResponseDTO update(Long id, CollaboratorWorkScheduleDTO dto) {
         CollaboratorWorkSchedule schedule = findEntityById(Objects.requireNonNull(id));
-        validateLunchWindow(dto.lunchStartTime(), dto.lunchEndTime());
+        validateAllowedWindow(dto.allowedStartTime(), dto.allowedEndTime());
 
         Collaborator collaborator = collaboratorRepository.findById(Objects.requireNonNull(dto.collaboratorId()))
                 .orElseThrow(() -> new ResourceNotFoundException("Colaborador não encontrado"));
 
         schedule.setCollaborator(collaborator);
         schedule.setDayOfWeek(dto.dayOfWeek());
-        schedule.setLunchStartTime(dto.lunchStartTime());
-        schedule.setLunchEndTime(dto.lunchEndTime());
+        schedule.setAllowedStartTime(dto.allowedStartTime());
+        schedule.setAllowedEndTime(dto.allowedEndTime());
         schedule.setActive(dto.active());
 
         return new CollaboratorWorkScheduleResponseDTO(scheduleRepository.save(schedule));
@@ -214,9 +214,9 @@ public class CollaboratorWorkScheduleService {
         return byDay;
     }
 
-    private void validateLunchWindow(LocalTime start, LocalTime end) {
+    private void validateAllowedWindow(LocalTime start, LocalTime end) {
         if (!end.isAfter(start)) {
-            throw new BusinessException("O término do almoço deve ser posterior ao início");
+            throw new BusinessException("O término da janela permitida deve ser posterior ao início");
         }
     }
 }

@@ -13,11 +13,11 @@ public record CollaboratorWorkScheduleDTO(
     @NotNull(message = "O dia da semana é obrigatório")
     WorkDay dayOfWeek,
 
-    @NotNull(message = "O horário de início do almoço é obrigatório")
-    LocalTime lunchStartTime,
+    @NotNull(message = "O horário de início permitido é obrigatório")
+    LocalTime allowedStartTime,
 
-    @NotNull(message = "O horário de término do almoço é obrigatório")
-    LocalTime lunchEndTime,
+    @NotNull(message = "O horário de término permitido é obrigatório")
+    LocalTime allowedEndTime,
 
     boolean active
 ) {}

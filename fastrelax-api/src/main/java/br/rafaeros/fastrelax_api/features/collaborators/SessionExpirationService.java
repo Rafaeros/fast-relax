@@ -29,6 +29,7 @@ public class SessionExpirationService {
 
     private final CollaboratorSessionRepository sessionRepository;
     private final SessionSettingsService sessionSettingsService;
+    private final br.rafaeros.fastrelax_api.features.chairs.ChairCommandService chairCommandService;
 
     /**
      * Marca como EXPIRED as sessões ativas que ficaram para trás:
@@ -55,6 +56,11 @@ public class SessionExpirationService {
         List<CollaboratorSession> expired = new ArrayList<>();
         for (CollaboratorSession session : candidates) {
             if (isAbandoned(session, today, now, graceMinutes)) {
+                // Sessão iniciada e nunca finalizada deixa o relé ligado até o
+                // ESP32 encerrar por conta própria; o comando antecipa isso.
+                if (session.getStatus() == SessionStatus.STARTED) {
+                    chairCommandService.stopFor(session.getChair(), session.getId());
+                }
                 session.setStatus(SessionStatus.EXPIRED);
                 expired.add(session);
             }

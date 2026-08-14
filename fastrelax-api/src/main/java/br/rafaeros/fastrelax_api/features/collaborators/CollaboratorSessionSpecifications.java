@@ -24,6 +24,26 @@ public final class CollaboratorSessionSpecifications {
                 : cb.equal(root.get("sessionDate"), sessionDate);
     }
 
+    /**
+     * Intervalo fechado de datas. Cada extremo é opcional: informar só um deles
+     * vale como "a partir de" ou "até".
+     */
+    public static Specification<CollaboratorSession> betweenDates(java.time.LocalDate from,
+            java.time.LocalDate to) {
+        return (root, query, cb) -> {
+            if (from == null && to == null) {
+                return null;
+            }
+            if (from == null) {
+                return cb.lessThanOrEqualTo(root.get("sessionDate"), to);
+            }
+            if (to == null) {
+                return cb.greaterThanOrEqualTo(root.get("sessionDate"), from);
+            }
+            return cb.between(root.get("sessionDate"), from, to);
+        };
+    }
+
     public static Specification<CollaboratorSession> hasCollaborator(Long collaboratorId) {
         return (root, query, cb) -> collaboratorId == null
                 ? null

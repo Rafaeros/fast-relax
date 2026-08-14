@@ -91,7 +91,7 @@ public class CollaboratorSessionController {
 
     @PostMapping
     @PreAuthorize("@collaboratorSecurity.canAccessCollaborator(#dto.collaboratorId())")
-    @Operation(summary = "Agenda uma sessão dentro do horário de almoço")
+    @Operation(summary = "Agenda uma sessão dentro do horário permitido")
     public ResponseEntity<ApiResponseDTO<CollaboratorSessionResponseDTO>> create(
             @RequestBody @Valid CollaboratorSessionDTO dto) {
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -106,6 +106,15 @@ public class CollaboratorSessionController {
             @RequestBody @Valid CollaboratorSessionDTO dto) {
         return ResponseEntity.ok(ApiResponseDTO.success(sessionService.update(id, dto),
                 "Sessão reagendada com sucesso"));
+    }
+
+    /** Inicia a sessão de agora sem o app precisar descobrir o id antes. */
+    @PatchMapping("/me/start")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Inicia a sessão vigente do colaborador logado, sem informar id")
+    public ResponseEntity<ApiResponseDTO<CollaboratorSessionResponseDTO>> startCurrent() {
+        return ResponseEntity.ok(ApiResponseDTO.success(sessionService.startCurrent(),
+                "Sessão iniciada com sucesso"));
     }
 
     @PatchMapping("/{id}/start")

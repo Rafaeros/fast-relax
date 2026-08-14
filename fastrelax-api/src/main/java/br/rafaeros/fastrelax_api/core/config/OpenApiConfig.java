@@ -24,7 +24,7 @@ public class OpenApiConfig {
                 .info(new Info()
                         .title("FastRelax API")
                         .version("v1")
-                        .description("Agendamento de sessões de descanso na janela de almoço dos colaboradores."))
+                        .description("Agendamento de sessões de descanso na janela de horário permitido dos colaboradores."))
                 .addSecurityItem(new SecurityRequirement().addList(SECURITY_SCHEME))
                 .components(new Components().addSecuritySchemes(SECURITY_SCHEME,
                         new SecurityScheme()

@@ -13,7 +13,7 @@ public interface CollaboratorWorkScheduleRepository
 
     List<CollaboratorWorkSchedule> findByCollaboratorId(Long collaboratorId);
 
-    /** Janela de almoço vigente do colaborador num dia da semana. */
+    /** Janela de horário permitido vigente do colaborador num dia da semana. */
     Optional<CollaboratorWorkSchedule> findByCollaboratorIdAndDayOfWeekAndActiveTrue(Long collaboratorId,
             WorkDay dayOfWeek);
 

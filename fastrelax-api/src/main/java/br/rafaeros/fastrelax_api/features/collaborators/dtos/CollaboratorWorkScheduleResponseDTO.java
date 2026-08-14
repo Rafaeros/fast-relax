@@ -10,8 +10,10 @@ public record CollaboratorWorkScheduleResponseDTO(
     Long collaboratorId,
     String collaboratorName,
     WorkDay dayOfWeek,
-    LocalTime lunchStartTime,
-    LocalTime lunchEndTime,
+    /** Mesmo dia em português, pronto para exibição. */
+    String dayOfWeekLabel,
+    LocalTime allowedStartTime,
+    LocalTime allowedEndTime,
     boolean active,
     LocalDateTime createdAt,
     LocalDateTime deletedAt
@@ -22,8 +24,9 @@ public record CollaboratorWorkScheduleResponseDTO(
             entity.getCollaborator() != null ? entity.getCollaborator().getId() : null,
             entity.getCollaborator() != null ? entity.getCollaborator().getName() : null,
             entity.getDayOfWeek(),
-            entity.getLunchStartTime(),
-            entity.getLunchEndTime(),
+            entity.getDayOfWeek() != null ? entity.getDayOfWeek().getLabel() : null,
+            entity.getAllowedStartTime(),
+            entity.getAllowedEndTime(),
             entity.isActive(),
             entity.getCreatedAt(),
             entity.getDeletedAt()

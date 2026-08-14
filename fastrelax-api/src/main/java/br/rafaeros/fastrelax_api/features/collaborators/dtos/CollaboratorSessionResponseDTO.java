@@ -6,6 +6,11 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.LocalDateTime;
 
+/**
+ * @param status      valor do enum, estável para comparação no cliente
+ * @param statusLabel mesmo status em português, pronto para exibição
+ * @param chairId     cadeira que atendeu; nula enquanto a sessão não foi iniciada
+ */
 public record CollaboratorSessionResponseDTO(
     Long id,
     Long collaboratorId,
@@ -14,6 +19,9 @@ public record CollaboratorSessionResponseDTO(
     LocalTime startTime,
     LocalTime endTime,
     SessionStatus status,
+    String statusLabel,
+    Long chairId,
+    String chairName,
     LocalDateTime startedAt,
     LocalDateTime finishedAt,
     LocalDateTime createdAt
@@ -27,6 +35,9 @@ public record CollaboratorSessionResponseDTO(
             entity.getStartTime(),
             entity.getEndTime(),
             entity.getStatus(),
+            entity.getStatus() != null ? entity.getStatus().getLabel() : null,
+            entity.getChair() != null ? entity.getChair().getId() : null,
+            entity.getChair() != null ? entity.getChair().getName() : null,
             entity.getStartedAt(),
             entity.getFinishedAt(),
             entity.getCreatedAt()

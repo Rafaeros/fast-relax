@@ -35,3 +35,15 @@ build/
 
 .env
 /target/
+
+logs/
+tmp/
+
+.aiox-core/
+.claude/
+.codex/
+.cursor/
+.gemini/
+.github/
+.kimi/
+.antigravity/

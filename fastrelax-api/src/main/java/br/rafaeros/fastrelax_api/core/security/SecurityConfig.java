@@ -24,6 +24,7 @@ import lombok.RequiredArgsConstructor;
 public class SecurityConfig {
 
     private final SecurityFilter securityFilter;
+    private final DeviceTokenFilter deviceTokenFilter;
     private final PasswordChangeRequiredFilter passwordChangeRequiredFilter;
     private final UrlBasedCorsConfigurationSource corsConfigurationSource;
 
@@ -42,9 +43,12 @@ public class SecurityConfig {
                 // actuator continuam exigindo autenticação.
                 .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
                 .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
+                // Autenticado pelo DeviceTokenFilter, não por JWT: o ESP32 não faz login.
+                .requestMatchers(HttpMethod.POST, "/chairs/heartbeat").permitAll()
                 .requestMatchers(HttpMethod.POST, "/users").hasRole("ADMIN")
                 .anyRequest().authenticated()
             )
+            .addFilterBefore(deviceTokenFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(securityFilter, UsernamePasswordAuthenticationFilter.class)
             // Depois do SecurityFilter: precisa do usuário já autenticado no contexto
             // para saber se ele ainda está com a senha temporária.

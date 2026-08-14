@@ -32,14 +32,14 @@ import lombok.RequiredArgsConstructor;
 @RestController
 @RequestMapping("/collaborators")
 @RequiredArgsConstructor
-@Tag(name = "Horários de almoço")
+@Tag(name = "Horários permitidos")
 public class CollaboratorWorkScheduleController {
 
     private final CollaboratorWorkScheduleService scheduleService;
 
     @GetMapping("/schedules")
     @PreAuthorize("@collaboratorSecurity.hasAdminOrRhAccess()")
-    @Operation(summary = "Lista os horários de almoço cadastrados")
+    @Operation(summary = "Lista os horários permitidos cadastrados")
     public ResponseEntity<ApiResponseDTO<Page<CollaboratorWorkScheduleResponseDTO>>> listAll(
             @ParameterObject CollaboratorWorkScheduleFilterDTO filter,
             @ParameterObject @PageableDefault(size = 10) Pageable pageable) {
@@ -50,7 +50,7 @@ public class CollaboratorWorkScheduleController {
 
     @GetMapping("/schedules/{id}")
     @PreAuthorize("isAuthenticated()")
-    @Operation(summary = "Busca um horário de almoço por id")
+    @Operation(summary = "Busca um horário permitido por id")
     public ResponseEntity<ApiResponseDTO<CollaboratorWorkScheduleResponseDTO>> getById(@PathVariable Long id) {
         // O service checa se o colaborador logado é o dono do horário.
         return ResponseEntity.ok(ApiResponseDTO.success(scheduleService.findById(id), "Horário encontrado"));
@@ -59,7 +59,7 @@ public class CollaboratorWorkScheduleController {
     /** Semana do colaborador logado. Evita o app ter que guardar o próprio id. */
     @GetMapping("/me/schedules")
     @PreAuthorize("isAuthenticated()")
-    @Operation(summary = "Semana de almoço do colaborador logado")
+    @Operation(summary = "Semana de horários permitidos do colaborador logado")
     public ResponseEntity<ApiResponseDTO<List<CollaboratorWorkScheduleResponseDTO>>> myWeeklySchedule() {
         List<CollaboratorWorkScheduleResponseDTO> schedules = scheduleService.findMyWeeklySchedule();
         return ResponseEntity.ok(ApiResponseDTO.success(schedules, "Horários da semana listados com sucesso"));
@@ -68,7 +68,7 @@ public class CollaboratorWorkScheduleController {
     @GetMapping("/{collaboratorId}/schedules")
     @PreAuthorize("@collaboratorSecurity.hasAdminOrRhAccess()"
             + " or @collaboratorSecurity.canAccessCollaborator(#collaboratorId)")
-    @Operation(summary = "Semana de almoço de um colaborador")
+    @Operation(summary = "Semana de horários permitidos de um colaborador")
     public ResponseEntity<ApiResponseDTO<List<CollaboratorWorkScheduleResponseDTO>>> getWeeklySchedule(
             @PathVariable Long collaboratorId) {
         List<CollaboratorWorkScheduleResponseDTO> schedules = scheduleService.findWeeklySchedule(collaboratorId);
@@ -89,7 +89,7 @@ public class CollaboratorWorkScheduleController {
 
     @PostMapping("/schedules")
     @PreAuthorize("@collaboratorSecurity.hasAdminOrRhAccess()")
-    @Operation(summary = "Cadastra o horário de almoço de um único dia")
+    @Operation(summary = "Cadastra o horário permitido de um único dia")
     public ResponseEntity<ApiResponseDTO<CollaboratorWorkScheduleResponseDTO>> create(
             @RequestBody @Valid CollaboratorWorkScheduleDTO dto) {
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -98,7 +98,7 @@ public class CollaboratorWorkScheduleController {
 
     @PutMapping("/schedules/{id}")
     @PreAuthorize("@collaboratorSecurity.hasAdminOrRhAccess()")
-    @Operation(summary = "Atualiza o horário de almoço de um único dia")
+    @Operation(summary = "Atualiza o horário permitido de um único dia")
     public ResponseEntity<ApiResponseDTO<CollaboratorWorkScheduleResponseDTO>> update(@PathVariable Long id,
             @RequestBody @Valid CollaboratorWorkScheduleDTO dto) {
         return ResponseEntity.ok(ApiResponseDTO.success(scheduleService.update(id, dto),
@@ -107,7 +107,7 @@ public class CollaboratorWorkScheduleController {
 
     @DeleteMapping("/schedules/{id}")
     @PreAuthorize("@collaboratorSecurity.hasAdminOrRhAccess()")
-    @Operation(summary = "Remove o horário de almoço de um dia")
+    @Operation(summary = "Remove o horário permitido de um dia")
     public ResponseEntity<ApiResponseDTO<Void>> delete(@PathVariable Long id) {
         scheduleService.softDelete(id);
         return ResponseEntity.ok(ApiResponseDTO.success("Horário deletado com sucesso"));

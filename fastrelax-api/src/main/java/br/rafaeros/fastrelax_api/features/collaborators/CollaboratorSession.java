@@ -51,6 +51,11 @@ public class CollaboratorSession {
     @Column(nullable = false, length = 30)
     private SessionStatus status;
 
+    /** Cadeira que atendeu. Só é preenchida quando a sessão é iniciada. */
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "chair_id")
+    private br.rafaeros.fastrelax_api.features.chairs.Chair chair;
+
     @Column(name = "started_at")
     private LocalDateTime startedAt;
 

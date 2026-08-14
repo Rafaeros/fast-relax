@@ -45,6 +45,7 @@ public class CollaboratorSessionService {
     private final CollaboratorSecurity collaboratorSecurity;
     private final SessionSettingsService sessionSettingsService;
     private final SessionExpirationService sessionExpirationService;
+    private final br.rafaeros.fastrelax_api.features.chairs.ChairCommandService chairCommandService;
 
     public Page<CollaboratorSessionResponseDTO> findAll(CollaboratorSessionFilterDTO dto,
             @org.springframework.lang.NonNull Pageable pageable) {
@@ -63,6 +64,8 @@ public class CollaboratorSessionService {
         Specification<CollaboratorSession> spec = Specification.allOf(
                 CollaboratorSessionSpecifications.hasStatus(dto != null ? dto.status() : null),
                 CollaboratorSessionSpecifications.onDate(dto != null ? dto.sessionDate() : null),
+                CollaboratorSessionSpecifications.betweenDates(dto != null ? dto.from() : null,
+                        dto != null ? dto.to() : null),
                 CollaboratorSessionSpecifications.hasCollaborator(collaboratorId));
 
         return sessionRepository.findAll(spec, Objects.requireNonNull(pageable))
@@ -93,7 +96,7 @@ public class CollaboratorSessionService {
      * colaborador pode escolher sem precisar consultar dia a dia.
      *
      * <p>
-     * Dias sem janela de almoço e dias lotados não entram no resultado, então a
+     * Dias sem janela de horário permitido e dias lotados não entram no resultado, então a
      * lista devolvida já é exatamente o que pode ser selecionado.
      *
      * @param collaboratorId opcional para colaborador logado — assume o próprio id
@@ -139,7 +142,7 @@ public class CollaboratorSessionService {
      * {@code available = false}, para a tela poder exibi-los desabilitados.
      *
      * <p>
-     * Vazio apenas quando o dia não tem janela de almoço configurada — domingo ou
+     * Vazio apenas quando o dia não tem janela de horário permitido configurada — domingo ou
      * dia que o colaborador não trabalha.
      */
     private Optional<AvailableDayDTO> buildDay(Long collaboratorId, LocalDate date, int durationMinutes,
@@ -160,12 +163,12 @@ public class CollaboratorSessionService {
                 .toList();
 
         List<SessionSlotDTO> slots = new ArrayList<>();
-        LocalTime slotStart = window.getLunchStartTime();
+        LocalTime slotStart = window.getAllowedStartTime();
         LocalTime slotEnd = slotStart.plusMinutes(durationMinutes);
 
-        // Para enquanto o slot inteiro couber no almoço; o teste de isAfter também
+        // Para enquanto o slot inteiro couber na janela permitida; o teste de isAfter também
         // encerra o laço se a soma cruzar a meia-noite.
-        while (!slotEnd.isAfter(window.getLunchEndTime()) && slotEnd.isAfter(slotStart)) {
+        while (!slotEnd.isAfter(window.getAllowedEndTime()) && slotEnd.isAfter(slotStart)) {
             slots.add(new SessionSlotDTO(slotStart, slotEnd,
                     isSlotAvailable(slotStart, slotEnd, date, busyOnDate)));
             slotStart = slotEnd;
@@ -174,8 +177,8 @@ public class CollaboratorSessionService {
 
         return slots.isEmpty()
                 ? Optional.empty()
-                : Optional.of(new AvailableDayDTO(date, window.getDayOfWeek(), window.getLunchStartTime(),
-                        window.getLunchEndTime(), slots));
+                : Optional.of(new AvailableDayDTO(date, window.getDayOfWeek(), window.getAllowedStartTime(),
+                        window.getAllowedEndTime(), slots));
     }
 
     @Transactional
@@ -189,7 +192,7 @@ public class CollaboratorSessionService {
 
         LocalTime endTime = resolveEndTime(dto.startTime());
         validateWindow(dto.sessionDate(), dto.startTime(), endTime);
-        validateWithinLunchWindow(dto.collaboratorId(), dto.sessionDate(), dto.startTime(), endTime);
+        validateWithinAllowedWindow(dto.collaboratorId(), dto.sessionDate(), dto.startTime(), endTime);
         requireNoActiveSession(dto.collaboratorId());
         requireSlotFree(dto.sessionDate(), dto.startTime(), endTime, null);
 
@@ -216,7 +219,7 @@ public class CollaboratorSessionService {
         // valem para a nova data.
         LocalTime endTime = resolveEndTime(dto.startTime());
         validateWindow(dto.sessionDate(), dto.startTime(), endTime);
-        validateWithinLunchWindow(session.getCollaborator().getId(), dto.sessionDate(), dto.startTime(), endTime);
+        validateWithinAllowedWindow(session.getCollaborator().getId(), dto.sessionDate(), dto.startTime(), endTime);
         requireSlotFree(dto.sessionDate(), dto.startTime(), endTime, session.getId());
 
         session.setSessionDate(dto.sessionDate());
@@ -236,15 +239,68 @@ public class CollaboratorSessionService {
         requireStatus(session, SessionStatus.SCHEDULED, "iniciada");
         validateStartWindow(session);
 
+        // Aciona a cadeira antes de gravar: se o relé não ligar, a sessão continua
+        // agendada e o colaborador pode tentar de novo dentro da tolerância.
+        int durationSeconds = (int) java.time.Duration
+                .between(session.getStartTime(), session.getEndTime()).getSeconds();
+        session.setChair(chairCommandService.startFor(session.getId(), durationSeconds));
+
         session.setStatus(SessionStatus.STARTED);
         session.setStartedAt(LocalDateTime.now());
         return new CollaboratorSessionResponseDTO(sessionRepository.save(session));
+    }
+
+    /**
+     * Inicia a sessão vigente do colaborador logado, sem receber id.
+     *
+     * <p>
+     * O app não precisa guardar id nem perguntar antes qual sessão é a de agora:
+     * o índice único {@code uq_collaborator_active_session} garante no máximo uma
+     * ativa por colaborador, então "a sessão dele" é sempre inequívoca. A janela
+     * de início continua sendo validada — o que muda é só quem descobre o id.
+     *
+     * <p>
+     * Chamar de novo com a sessão já em andamento devolve a mesma sessão em vez
+     * de erro: o toque duplicado na cadeira não pode virar falha.
+     */
+    @Transactional
+    public CollaboratorSessionResponseDTO startCurrent() {
+        // Expira antes de avaliar, para uma sessão vencida responder "EXPIRED"
+        // em vez de reclamar da janela de horário.
+        sessionExpirationService.expireAbandonedSessions();
+
+        Long collaboratorId = requireLoggedCollaboratorId();
+        CollaboratorSession session = sessionRepository
+                .findByCollaboratorIdAndStatusIn(collaboratorId, ACTIVE_STATUSES)
+                .orElseThrow(() -> new BusinessException(
+                        "Você não tem sessão agendada. Agende um horário para iniciar."));
+
+        if (session.getStatus() == SessionStatus.STARTED) {
+            return new CollaboratorSessionResponseDTO(session);
+        }
+
+        validateStartWindow(session);
+
+        session.setStatus(SessionStatus.STARTED);
+        session.setStartedAt(LocalDateTime.now());
+        return new CollaboratorSessionResponseDTO(sessionRepository.save(session));
+    }
+
+    /** Só faz sentido para colaborador: ADMIN e RH não têm sessão própria. */
+    private Long requireLoggedCollaboratorId() {
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !(authentication.getPrincipal() instanceof Collaborator logged)) {
+            throw new AccessDeniedException("Rota disponível apenas para colaboradores autenticados");
+        }
+        return logged.getId();
     }
 
     @Transactional
     public CollaboratorSessionResponseDTO finish(Long id) {
         CollaboratorSession session = findEntityById(id);
         requireStatus(session, SessionStatus.STARTED, "finalizada");
+
+        chairCommandService.stopFor(session.getChair(), session.getId());
 
         session.setStatus(SessionStatus.DONE);
         session.setFinishedAt(LocalDateTime.now());
@@ -257,6 +313,11 @@ public class CollaboratorSessionService {
         if (!session.getStatus().isActive()) {
             throw new BusinessException(
                     "Sessão com status " + session.getStatus() + " não pode ser cancelada");
+        }
+
+        // Só há o que desligar se a sessão chegou a ligar a cadeira.
+        if (session.getStatus() == SessionStatus.STARTED) {
+            chairCommandService.stopFor(session.getChair(), session.getId());
         }
 
         session.setStatus(SessionStatus.CANCELLED);
@@ -362,27 +423,27 @@ public class CollaboratorSessionService {
                 session -> session.getStartTime().isBefore(slotEnd) && session.getEndTime().isAfter(slotStart));
     }
 
-    private CollaboratorWorkSchedule requireLunchWindow(Long collaboratorId, LocalDate sessionDate) {
+    private CollaboratorWorkSchedule requireAllowedWindow(Long collaboratorId, LocalDate sessionDate) {
         WorkDay day = WorkDay.from(sessionDate)
                 .orElseThrow(() -> new BusinessException(
                         "Não há expediente aos domingos; agende de segunda a sábado"));
 
         return workScheduleRepository.findByCollaboratorIdAndDayOfWeekAndActiveTrue(collaboratorId, day)
                 .orElseThrow(() -> new BusinessException(
-                        "Colaborador não possui horário de almoço configurado para " + day));
+                        "Colaborador não possui horário permitido configurado para " + day));
     }
 
     /**
-     * A sessão precisa caber inteira na janela de almoço configurada para aquele
+     * A sessão precisa caber inteira na janela de horário permitido configurada para aquele
      * dia da semana — é a razão de {@code CollaboratorWorkSchedule} existir.
      */
-    private void validateWithinLunchWindow(Long collaboratorId, LocalDate sessionDate, LocalTime startTime,
+    private void validateWithinAllowedWindow(Long collaboratorId, LocalDate sessionDate, LocalTime startTime,
             LocalTime endTime) {
-        CollaboratorWorkSchedule schedule = requireLunchWindow(collaboratorId, sessionDate);
+        CollaboratorWorkSchedule schedule = requireAllowedWindow(collaboratorId, sessionDate);
 
-        if (startTime.isBefore(schedule.getLunchStartTime()) || endTime.isAfter(schedule.getLunchEndTime())) {
-            throw new BusinessException("A sessão deve ficar dentro do horário de almoço ("
-                    + schedule.getLunchStartTime() + " às " + schedule.getLunchEndTime()
+        if (startTime.isBefore(schedule.getAllowedStartTime()) || endTime.isAfter(schedule.getAllowedEndTime())) {
+            throw new BusinessException("A sessão deve ficar dentro do horário permitido ("
+                    + schedule.getAllowedStartTime() + " às " + schedule.getAllowedEndTime()
                     + "); o horário solicitado vai de " + startTime + " a " + endTime);
         }
     }

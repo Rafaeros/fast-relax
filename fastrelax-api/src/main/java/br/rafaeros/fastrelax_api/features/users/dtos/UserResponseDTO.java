@@ -8,12 +8,15 @@ public record UserResponseDTO (
     String name,
     String email,
     UserRole role,
+    /** Mesmo perfil em português, pronto para exibição. */
+    String roleLabel,
     /** Verdadeiro enquanto o usuário ainda não definiu a própria senha. */
     boolean mustChangePassword,
     boolean active
 ){
     public UserResponseDTO(User user) {
         this(user.getId(), user.getName(), user.getEmail(), user.getRole(),
+                user.getRole() != null ? user.getRole().getLabel() : null,
                 user.isMustChangePassword(), user.isActive());
     }
 }

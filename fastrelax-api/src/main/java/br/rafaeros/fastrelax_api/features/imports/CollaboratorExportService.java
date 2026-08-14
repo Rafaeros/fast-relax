@@ -70,8 +70,8 @@ public class CollaboratorExportService {
                     cryptoService.decrypt(collaborator.getCpfEncrypted()),
                     collaborator.getPhoneNumber(),
                     collaborator.getDepartment() != null ? collaborator.getDepartment().getName() : "",
-                    reference != null ? reference.getLunchStartTime().format(TIME_FORMAT) : "",
-                    reference != null ? reference.getLunchEndTime().format(TIME_FORMAT) : ""
+                    reference != null ? reference.getAllowedStartTime().format(TIME_FORMAT) : "",
+                    reference != null ? reference.getAllowedEndTime().format(TIME_FORMAT) : ""
             });
         }
 

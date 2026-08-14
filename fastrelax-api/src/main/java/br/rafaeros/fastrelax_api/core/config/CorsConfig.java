@@ -10,20 +10,23 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 /**
- * CORS para o painel do RH.
+ * CORS para acesso pelo navegador.
  *
  * <p>
- * Sem isto o navegador bloqueia toda chamada do painel no preflight. Apps
- * móveis não passam por CORS, então só o front web depende desta configuração.
+ * O painel chama a API pelo servidor do Next, então o caminho normal nem passa
+ * por aqui. Esta configuração cobre chamadas feitas direto do browser e
+ * ferramentas de rede. Apps móveis não são afetados por CORS.
  *
  * <p>
- * As origens vêm de {@code app.cors.allowed-origins} — nunca use {@code *} com
- * credenciais habilitadas, o navegador rejeita a combinação.
+ * As origens vêm de {@code CORS_ALLOWED_ORIGINS} no {@code .env} e devem
+ * conter apenas a máquina local e faixas privadas — a API não é exposta na
+ * internet. Curinga é usado no host e na porta, nunca a origem {@code *}
+ * sozinha: com credenciais habilitadas o navegador rejeita a combinação.
  */
 @Configuration
 public class CorsConfig {
 
-    @Value("${app.cors.allowed-origins:http://localhost:3000,http://localhost:5173,http://localhost:4200}")
+    @Value("${app.cors.allowed-origins}")
     private String allowedOrigins;
 
     @Bean

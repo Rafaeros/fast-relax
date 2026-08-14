@@ -1,0 +1,277 @@
+@import "tailwindcss";
+
+/* =========================================================================
+   CAMADA 1 — PALETA BRUTA (não usar direto nos componentes)
+   Gera utilities automáticas: bg-copper-500, text-neutral-300, etc.
+   ========================================================================= */
+@theme {
+  --color-bg-950: #0F0C08;
+  --color-bg-900: #17130D;
+  --color-bg-800: #211C15;
+  --color-bg-700: #2E2820;
+  --color-bg-600: #443A2C;
+
+  --color-neutral-500: #5F5546;
+  --color-neutral-400: #837763;
+  --color-neutral-300: #A89C8A;
+  --color-neutral-200: #CFC4AE;
+  --color-neutral-100: #E8E1D3;
+  --color-neutral-50:  #F5F1EA;
+
+  --color-copper-900: #3B2010;
+  --color-copper-800: #5E3419;
+  --color-copper-700: #824A22;
+  --color-copper-600: #A6612E;
+  --color-copper-500: #C2793C;
+  --color-copper-400: #D08C4E;
+  --color-copper-300: #DFA066;
+  --color-copper-200: #EABE8B;
+  --color-copper-100: #F5DDC0;
+  --color-copper-50:  #FBF0E4;
+
+  --color-gold-600: #C6952E;
+  --color-gold-500: #E0B360;
+  --color-gold-400: #F0C987;
+  --color-gold-glow: #FFD9A0;
+
+  --color-success-700: #2E5A3F;
+  --color-success-600: #438A5D;
+  --color-success-500: #5FA873;
+  --color-success-400: #7BC08D;
+  --color-success-bg:  #16261C;
+
+  --color-warning-700: #8A6414;
+  --color-warning-600: #C68C1F;
+  --color-warning-500: #E0A83A;
+  --color-warning-400: #F0C168;
+  --color-warning-bg:  #2E2412;
+
+  --color-error-700: #8C2E27;
+  --color-error-600: #C33F35;
+  --color-error-500: #E2574C;
+  --color-error-400: #EE7E72;
+  --color-error-bg:  #2E1512;
+
+  --color-info-700: #2C4E78;
+  --color-info-600: #3F73AC;
+  --color-info-500: #5B93D1;
+  --color-info-400: #82AEDD;
+  --color-info-bg:  #131F2E;
+
+  /* Sombras — geram utility shadow-{nome} */
+  --shadow-card: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -8px rgba(0,0,0,.55);
+  --shadow-card-hover: 0 2px 4px rgba(0,0,0,.45), 0 12px 32px -8px rgba(0,0,0,.6);
+  --shadow-glow-primary: 0 0 0 1px var(--color-copper-600), 0 0 24px -4px rgba(194,121,60,.45);
+  --shadow-focus: 0 0 0 3px rgba(194,121,60,.35);
+}
+
+/* =========================================================================
+   CAMADA 1.5 — ALIASES SEMÂNTICOS COMO UTILITIES
+   Apontam para a Camada 1 e geram classes utilitárias:
+   bg-surface-card, text-ink-secondary, border-line, font-display...
+   REGRA: componentes usam SÓ estas classes (nunca copper-500 direto).
+   Trocar o tema = reapontar estes aliases (ou editar a paleta acima).
+   ========================================================================= */
+@theme {
+  /* Superfícies / estrutura */
+  --color-surface-base:   var(--color-bg-950);
+  --color-surface-nav:    var(--color-bg-900);
+  --color-surface-card:   var(--color-bg-800);
+  --color-surface-hover:  var(--color-bg-700);
+  --color-surface-raised: var(--color-bg-600);
+  --color-line:           var(--color-bg-600);
+  --color-line-soft:      var(--color-bg-700);
+
+  /* Tinta (texto/ícone) */
+  --color-ink-primary:   var(--color-neutral-50);
+  --color-ink-secondary: var(--color-neutral-300);
+  --color-ink-tertiary:  var(--color-neutral-500);
+  --color-ink-muted:     var(--color-neutral-400);
+  --color-ink-inverse:   var(--color-copper-900);
+
+  /* Acento da marca */
+  --color-accent:        var(--color-copper-500);
+  --color-accent-strong: var(--color-copper-600);
+  --color-accent-soft:   var(--color-copper-300);
+  --color-accent-faint:  var(--color-copper-200);
+
+  /* Tipografia */
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-display-serif), Georgia, "Times New Roman", serif;
+
+  /* Raios */
+  --radius-card: 0.875rem;
+  --radius-control: 0.5rem;
+  --radius-pill: 9999px;
+}
+
+/* =========================================================================
+   CAMADA 2 — TOKENS SEMÂNTICOS (para CSS puro / var(--nome))
+   Não geram utilities — usados pelas classes de componente abaixo.
+   ========================================================================= */
+:root {
+  /* --- Texto --- */
+  --text-primary:    var(--color-neutral-50);   /* títulos, valores em destaque, números grandes */
+  --text-secondary:  var(--color-neutral-300);  /* labels, descrições, texto de apoio */
+  --text-tertiary:   var(--color-neutral-500);  /* placeholder, timestamp, texto desabilitado */
+  --text-on-primary: var(--color-copper-900);   /* texto em cima de botão/badge cobre (contraste AA) */
+  --text-link:       var(--color-copper-300);   /* links e texto clicável */
+  --text-link-hover: var(--color-copper-200);
+
+  /* --- Superfícies / estrutura --- */
+  --surface-base:   var(--color-bg-950); /* body / fundo geral do app */
+  --surface-nav:    var(--color-bg-900); /* sidebar, topbar */
+  --surface-card:   var(--color-bg-800); /* cards, painéis, modais */
+  --surface-hover:  var(--color-bg-700); /* hover de card, linha de tabela, item de menu */
+  --border-default: var(--color-bg-600); /* borda padrão de card/input */
+  --border-focus:   var(--color-copper-600); /* borda em foco/ativo */
+
+  /* --- Botão primário (ação principal) --- */
+  --btn-primary-bg:        var(--color-copper-500);
+  --btn-primary-bg-hover:  var(--color-copper-600);
+  --btn-primary-bg-active: var(--color-copper-700);
+  --btn-primary-text:      var(--color-copper-900);
+
+  /* --- Botão secundário (ação de apoio, outline) --- */
+  --btn-secondary-bg:        transparent;
+  --btn-secondary-bg-hover:  var(--color-bg-700);
+  --btn-secondary-border:    var(--color-bg-600);
+  --btn-secondary-text:      var(--color-neutral-100);
+
+  /* --- Botão "ghost"/terciário (menor hierarquia, ex: cancelar) --- */
+  --btn-ghost-text:       var(--color-neutral-300);
+  --btn-ghost-text-hover: var(--color-neutral-50);
+  --btn-ghost-bg-hover:   var(--color-bg-700);
+
+  /* --- Ícones --- */
+  --icon-default:  var(--color-neutral-400);
+  --icon-active:   var(--color-copper-400);
+  --icon-on-dark:  var(--color-neutral-50);
+}
+
+/* =========================================================================
+   CAMADA 3 — COMPONENTES PRONTOS (opcional, usar as classes direto no JSX)
+   ========================================================================= */
+@layer components {
+  .btn-primary {
+    background-color: var(--btn-primary-bg);
+    color: var(--btn-primary-text);
+    font-weight: 700;
+    border-radius: 0.5rem;
+    padding: 0.625rem 1.125rem;
+    transition: background-color .15s ease, box-shadow .15s ease;
+  }
+  .btn-primary:hover  { background-color: var(--btn-primary-bg-hover); box-shadow: var(--shadow-glow-primary); }
+  .btn-primary:active { background-color: var(--btn-primary-bg-active); }
+  .btn-primary:focus-visible { outline: none; box-shadow: var(--shadow-focus); }
+
+  .btn-secondary {
+    background-color: var(--btn-secondary-bg);
+    color: var(--btn-secondary-text);
+    border: 1px solid var(--btn-secondary-border);
+    border-radius: 0.5rem;
+    padding: 0.625rem 1.125rem;
+    transition: background-color .15s ease;
+  }
+  .btn-secondary:hover { background-color: var(--btn-secondary-bg-hover); }
+
+  .card {
+    background-color: var(--surface-card);
+    border: 1px solid var(--border-default);
+    border-radius: 0.875rem;
+    box-shadow: var(--shadow-card);
+    transition: box-shadow .15s ease, border-color .15s ease;
+  }
+  .card:hover {
+    box-shadow: var(--shadow-card-hover);
+    border-color: var(--color-bg-700);
+  }
+
+  .badge-success { background: var(--color-success-bg); color: var(--color-success-400); border: 1px solid var(--color-success-700); }
+  .badge-warning { background: var(--color-warning-bg); color: var(--color-warning-400); border: 1px solid var(--color-warning-700); }
+  .badge-error   { background: var(--color-error-bg);   color: var(--color-error-400);   border: 1px solid var(--color-error-700); }
+  .badge-info    { background: var(--color-info-bg);    color: var(--color-info-400);    border: 1px solid var(--color-info-700); }
+
+  /* --- Campo de formulário --- */
+  .input-base {
+    width: 100%;
+    background-color: var(--color-bg-900);
+    color: var(--text-primary);
+    border: 1px solid var(--border-default);
+    border-radius: 0.5rem;
+    padding: 0.625rem 0.875rem;
+    font-size: 0.9375rem;
+    line-height: 1.5;
+    transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease;
+  }
+  .input-base::placeholder { color: var(--text-tertiary); }
+  .input-base:hover:not(:disabled) { border-color: var(--color-bg-700); }
+  .input-base:focus {
+    outline: none;
+    border-color: var(--border-focus);
+    box-shadow: var(--shadow-focus);
+  }
+  .input-base:disabled { opacity: .55; cursor: not-allowed; }
+
+  /* O X nativo do type="search" duplicaria o botão de limpar do componente. */
+  .input-base::-webkit-search-cancel-button,
+  .input-base::-webkit-search-decoration {
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  .input-base[aria-invalid="true"] {
+    border-color: var(--color-error-600);
+  }
+  .input-base[aria-invalid="true"]:focus {
+    box-shadow: 0 0 0 3px rgba(226,87,76,.28);
+  }
+
+  /* --- Texto de olho ("eyebrow") acima de títulos de seção --- */
+  .eyebrow {
+    color: var(--color-copper-300);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+  }
+
+  /* --- Título com gradiente cobre (assinatura visual) --- */
+  .text-gradient-accent {
+    background-image: linear-gradient(
+      100deg,
+      var(--color-copper-200) 0%,
+      var(--color-copper-400) 45%,
+      var(--color-copper-600) 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* --- Linha divisória sutil de largura total --- */
+  .hairline {
+    height: 1px;
+    background-image: linear-gradient(
+      to right,
+      transparent,
+      var(--color-bg-600) 20%,
+      var(--color-bg-600) 80%,
+      transparent
+    );
+  }
+
+  /* --- Brilho ambiente decorativo (hero / seções) --- */
+  .ambient-glow {
+    background-image: radial-gradient(
+      55% 55% at 50% 40%,
+      rgba(194, 121, 60, 0.20) 0%,
+      rgba(194, 121, 60, 0.06) 45%,
+      transparent 75%
+    );
+  }
+}
+
+body {
+  background-color: var(--surface-base);
+  color: var(--text-primary);
+}

@@ -82,8 +82,8 @@ CREATE TABLE collaborator_work_schedules (
         'FRIDAY',
         'SATURDAY'
     )),
-    lunch_start_time TIME NOT NULL,
-    lunch_end_time TIME NOT NULL,
+    allowed_start_time TIME NOT NULL,
+    allowed_end_time TIME NOT NULL,
     active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,

@@ -44,11 +44,11 @@ public class CollaboratorWorkSchedule {
     @Column(name = "day_of_week", nullable = false, length = 10)
     private WorkDay dayOfWeek;
 
-    @Column(name = "lunch_start_time", nullable = false)
-    private LocalTime lunchStartTime;
+    @Column(name = "allowed_start_time", nullable = false)
+    private LocalTime allowedStartTime;
 
-    @Column(name = "lunch_end_time", nullable = false)
-    private LocalTime lunchEndTime;
+    @Column(name = "allowed_end_time", nullable = false)
+    private LocalTime allowedEndTime;
 
     @Column(nullable = false)
     private boolean active = true;

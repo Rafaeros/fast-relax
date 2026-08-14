@@ -50,12 +50,12 @@ public class CollaboratorImportController {
     }
 
     /**
-     * Importa colaboradores e o horário de almoço de segunda a sexta.
+     * Importa colaboradores e o horário permitido de segunda a sexta.
      * Envie como {@code multipart/form-data} no campo {@code file}.
      */
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("@collaboratorSecurity.hasAdminOrRhAccess()")
-    @Operation(summary = "Importa colaboradores, departamentos e horários de almoço a partir de .xlsx")
+    @Operation(summary = "Importa colaboradores, departamentos e horários permitidos a partir de .xlsx")
     public ResponseEntity<ApiResponseDTO<ImportResultDTO>> importCollaborators(
             @RequestParam("file") MultipartFile file) {
         ImportResultDTO result = importService.importFrom(file);

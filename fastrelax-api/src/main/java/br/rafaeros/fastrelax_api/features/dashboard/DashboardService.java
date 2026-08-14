@@ -92,7 +92,7 @@ public class DashboardService {
         return collaboratorRepository.findAll().stream().filter(Collaborator::isActive).count();
     }
 
-    /** Colaborador sem almoço configurado nunca consegue agendar — o RH precisa ver isso. */
+    /** Colaborador sem horário permitido configurado nunca consegue agendar — o RH precisa ver isso. */
     private long countCollaboratorsWithoutSchedule() {
         List<Long> withSchedule = scheduleRepository.findAll().stream()
                 .filter(CollaboratorWorkSchedule::isActive)

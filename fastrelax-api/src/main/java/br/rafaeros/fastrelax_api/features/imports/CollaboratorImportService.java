@@ -37,7 +37,7 @@ import lombok.RequiredArgsConstructor;
  * Importação em massa de colaboradores a partir de planilha.
  *
  * <p>
- * Cada linha percorre a cadeia departamento → colaborador → horário de almoço,
+ * Cada linha percorre a cadeia departamento → colaborador → horário permitido,
  * sempre em modo upsert: o que já existe é reaproveitado ou atualizado, nunca
  * duplicado. Isso torna a importação repetível — reenviar o mesmo arquivo não
  * cria registros novos.
@@ -50,9 +50,9 @@ public class CollaboratorImportService {
     static final int COL_CPF = 1;
     static final int COL_PHONE = 2;
     static final int COL_DEPARTMENT = 3;
-    static final int COL_LUNCH_START = 4;
-    static final int COL_LUNCH_END = 5;
-    static final int LAST_COLUMN = COL_LUNCH_END;
+    static final int COL_ALLOWED_START = 4;
+    static final int COL_ALLOWED_END = 5;
+    static final int LAST_COLUMN = COL_ALLOWED_END;
 
     /** Dias aplicados a todos os importados: o arquivo traz só os horários. */
     private static final Set<WorkDay> DEFAULT_WORK_DAYS =
@@ -121,10 +121,10 @@ public class CollaboratorImportService {
         String phone = requireText(ImportCellReader.readString(row, COL_PHONE), "Telefone");
         String departmentName = requireText(ImportCellReader.readString(row, COL_DEPARTMENT), "Departamento");
 
-        LocalTime lunchStart = ImportCellReader.readTime(row, COL_LUNCH_START, "Início do almoço");
-        LocalTime lunchEnd = ImportCellReader.readTime(row, COL_LUNCH_END, "Fim do almoço");
-        if (!lunchEnd.isAfter(lunchStart)) {
-            throw new BusinessException("Fim do almoço deve ser posterior ao início");
+        LocalTime allowedStart = ImportCellReader.readTime(row, COL_ALLOWED_START, "Início da janela permitida");
+        LocalTime allowedEnd = ImportCellReader.readTime(row, COL_ALLOWED_END, "Fim da janela permitida");
+        if (!allowedEnd.isAfter(allowedStart)) {
+            throw new BusinessException("Fim da janela permitida deve ser posterior ao início");
         }
 
         // Aceita CPF formatado ("123.456.789-00") e repõe os zeros à esquerda que o
@@ -135,7 +135,7 @@ public class CollaboratorImportService {
 
         DepartmentOutcome department = resolveDepartment(departmentName, departmentCache);
         CollaboratorOutcome collaborator = upsertCollaborator(name, cpf, normalizedPhone, department.department());
-        int schedules = replaceWeekdaySchedules(collaborator.collaborator(), lunchStart, lunchEnd);
+        int schedules = replaceWeekdaySchedules(collaborator.collaborator(), allowedStart, allowedEnd);
 
         return new RowOutcome(department.created(), collaborator.created(), schedules);
     }
@@ -195,7 +195,7 @@ public class CollaboratorImportService {
      * Aplica o mesmo horário de segunda a sexta. Sábado, se existir, é desativado:
      * a planilha define a semana inteira, então o que ela não traz não vale mais.
      */
-    private int replaceWeekdaySchedules(Collaborator collaborator, LocalTime lunchStart, LocalTime lunchEnd) {
+    private int replaceWeekdaySchedules(Collaborator collaborator, LocalTime allowedStart, LocalTime allowedEnd) {
         Map<WorkDay, CollaboratorWorkSchedule> existing = new HashMap<>();
         for (CollaboratorWorkSchedule schedule : scheduleRepository
                 .findByCollaboratorIdIncludingDeleted(collaborator.getId())) {
@@ -210,8 +210,8 @@ public class CollaboratorImportService {
                 schedule.setCollaborator(collaborator);
                 schedule.setDayOfWeek(day);
             }
-            schedule.setLunchStartTime(lunchStart);
-            schedule.setLunchEndTime(lunchEnd);
+            schedule.setAllowedStartTime(allowedStart);
+            schedule.setAllowedEndTime(allowedEnd);
             schedule.setActive(true);
             schedule.setDeletedAt(null);
             scheduleRepository.save(schedule);
