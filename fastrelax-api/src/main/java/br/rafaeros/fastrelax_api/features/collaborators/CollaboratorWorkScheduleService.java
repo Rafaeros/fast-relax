@@ -50,7 +50,7 @@ public class CollaboratorWorkScheduleService {
                 CollaboratorWorkScheduleSpecifications.hasCollaborator(collaboratorId));
 
         return scheduleRepository.findAll(spec, Objects.requireNonNull(pageable))
-                .map(CollaboratorWorkScheduleResponseDTO::new);
+                .map(schedule -> new CollaboratorWorkScheduleResponseDTO(schedule));
     }
 
     public CollaboratorWorkScheduleResponseDTO findById(Long id) {
@@ -71,7 +71,7 @@ public class CollaboratorWorkScheduleService {
         requireCollaboratorAccess(collaboratorId);
         return scheduleRepository.findByCollaboratorId(Objects.requireNonNull(collaboratorId)).stream()
                 .sorted((a, b) -> a.getDayOfWeek().compareTo(b.getDayOfWeek()))
-                .map(CollaboratorWorkScheduleResponseDTO::new)
+                .map(schedule -> new CollaboratorWorkScheduleResponseDTO(schedule))
                 .toList();
     }
 
@@ -125,7 +125,7 @@ public class CollaboratorWorkScheduleService {
 
         return saved.stream()
                 .sorted((a, b) -> a.getDayOfWeek().compareTo(b.getDayOfWeek()))
-                .map(CollaboratorWorkScheduleResponseDTO::new)
+                .map(schedule -> new CollaboratorWorkScheduleResponseDTO(schedule))
                 .toList();
     }
 

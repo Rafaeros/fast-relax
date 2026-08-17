@@ -34,12 +34,18 @@ export function Navbar() {
       )}
     >
       <Container size="wide">
-        <nav className="flex h-18 items-center justify-between gap-6 py-4">
-          <a href="#inicio" className="flex items-center" aria-label={`${"physical"} — início`}>
+        <nav className="flex h-18 items-center justify-between gap-4 py-4 lg:gap-6">
+          <a
+            href="#inicio"
+            className="flex shrink-0 items-center"
+            aria-label={`${"physical"} — início`}
+          >
             <Logo priority />
           </a>
 
-          <ul className="hidden items-center gap-8 lg:flex">
+          {/* gap menor a partir de lg: os 5 links dividem o espaço que sobra
+              entre a logo e as ações, e 8 unidades estouravam em 1024px. */}
+          <ul className="hidden items-center gap-5 lg:flex xl:gap-8">
             {NAV_LINKS.map((link) => (
               <li key={link.href}>
                 <a
@@ -52,17 +58,37 @@ export function Navbar() {
             ))}
           </ul>
 
-          <div className="flex items-center gap-2">
+          {/*
+            shrink-0: sem isto o bloco de ações encolhia e os rótulos dos botões
+            quebravam em duas linhas quando os links de navegação apareciam.
+            Os textos são curtos pelo mesmo motivo — "Área do colaborador" e
+            "Área do cliente" juntos não cabem ao lado da logo e dos 5 links.
+          */}
+          <div className="flex shrink-0 items-center gap-2">
+            {/* Colaborador em destaque: é quem entra todo dia, enquanto o
+                acesso do RH é ocasional. */}
+            <Link
+              href="/colaborador/entrar"
+              className={buttonStyles({
+                variant: "primary",
+                size: "sm",
+                className: "hidden whitespace-nowrap sm:inline-flex",
+              })}
+            >
+              <Icon name="users" className="h-4 w-4" />
+              Colaborador
+            </Link>
+
             <Link
               href="/entrar"
               className={buttonStyles({
                 variant: "secondary",
                 size: "sm",
-                className: "hidden sm:inline-flex",
+                className: "hidden whitespace-nowrap sm:inline-flex",
               })}
             >
               <Icon name="lock" className="h-4 w-4" />
-              Área do cliente
+              Cliente
             </Link>
 
             <Button
@@ -95,7 +121,15 @@ export function Navbar() {
                   </a>
                 </li>
               ))}
-              <li className="pt-3 sm:hidden">
+              <li className="flex flex-col gap-2 pt-3 sm:hidden">
+                <Link
+                  href="/colaborador/entrar"
+                  onClick={() => setMenuOpen(false)}
+                  className={buttonStyles({ variant: "primary", size: "sm", fullWidth: true })}
+                >
+                  <Icon name="users" className="h-4 w-4" />
+                  Área do colaborador
+                </Link>
                 <Link
                   href="/entrar"
                   onClick={() => setMenuOpen(false)}

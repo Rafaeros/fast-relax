@@ -62,6 +62,13 @@ export async function apiFetch<T>(
     );
   }
 
+  // 204 é resposta válida e sem corpo: a API usa para "consultei e não há nada"
+  // (ex.: colaborador sem sessão em aberto). Tratar como falha faria o app
+  // mostrar erro onde a resposta correta é "nenhum".
+  if (response.status === 204) {
+    return { ok: true, data: null as T, message: "" };
+  }
+
   if (!envelope) {
     return apiFailure(GENERIC_ERROR, response.status);
   }

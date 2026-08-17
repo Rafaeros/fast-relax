@@ -8,9 +8,9 @@ export const brand = {
   tagline: "Bem-estar corporativo com cadeiras de massagem",
   logo: {
     /** Logo horizontal (marca + tipografia) usada na navbar e no rodapé. */
-    src: "/brand/logo-physical.svg",
+    src: "/brand/logo-physical.png",
     /** Símbolo isolado, para favicon/app/mobile. */
-    markSrc: "/brand/logo-physical-mark.svg",
+    markSrc: "/brand/logo-physical-mark.png",
     alt: "physical",
     width: 148,
     height: 32,

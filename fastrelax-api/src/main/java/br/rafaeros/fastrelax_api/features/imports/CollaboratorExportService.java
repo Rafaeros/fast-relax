@@ -47,7 +47,8 @@ public class CollaboratorExportService {
     public byte[] export(boolean onlyActive) {
         List<Collaborator> collaborators = collaboratorRepository.findAll().stream()
                 .filter(collaborator -> !onlyActive || collaborator.isActive())
-                .sorted(Comparator.comparing(Collaborator::getName, String.CASE_INSENSITIVE_ORDER))
+                .sorted(Comparator.comparing((Collaborator collaborator) -> collaborator.getName(),
+                        String.CASE_INSENSITIVE_ORDER))
                 .toList();
 
         // Uma consulta para todos os horários, em vez de uma por colaborador.
@@ -89,7 +90,7 @@ public class CollaboratorExportService {
             return null;
         }
         return schedules.stream()
-                .filter(CollaboratorWorkSchedule::isActive)
+                .filter(schedule -> schedule.isActive())
                 .min(Comparator.comparing(schedule -> schedule.getDayOfWeek() == REFERENCE_DAY ? 0 : 1))
                 .orElse(null);
     }

@@ -4,7 +4,6 @@ import {
   Card,
   CardBody,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardMedia,
   CardTitle,
@@ -100,13 +99,6 @@ export function Programs() {
                   ))}
                 </div>
               </CardBody>
-
-              <CardFooter>
-                <span className="text-xs font-semibold uppercase tracking-[0.18em] text-ink-secondary">
-                  Ver detalhes
-                </span>
-                <Icon name="arrowRight" className="h-4 w-4 text-accent-soft" />
-              </CardFooter>
             </div>
           </Card>
         ))}

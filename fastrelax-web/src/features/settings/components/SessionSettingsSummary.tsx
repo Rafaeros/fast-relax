@@ -8,7 +8,7 @@ export type SessionSettingsSummaryProps = {
   settings: SessionSettings;
 };
 
-/** Os três parâmetros vigentes, em leitura rápida acima do formulário. */
+/** Os parâmetros vigentes, em leitura rápida acima do formulário. */
 export function SessionSettingsSummary({ settings }: SessionSettingsSummaryProps) {
   const cards: { value: string; label: string; icon: IconName }[] = [
     {
@@ -22,6 +22,11 @@ export function SessionSettingsSummary({ settings }: SessionSettingsSummaryProps
       icon: "bell",
     },
     {
+      value: `${settings.earlyStartMinutes} min`,
+      label: "Antecedência de início",
+      icon: "play",
+    },
+    {
       value: `${settings.maxAdvanceDays} ${settings.maxAdvanceDays === 1 ? "dia" : "dias"}`,
       label: "Antecedência máxima",
       icon: "calendar",
@@ -29,7 +34,7 @@ export function SessionSettingsSummary({ settings }: SessionSettingsSummaryProps
   ];
 
   return (
-    <div className="grid gap-4 sm:grid-cols-3">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {cards.map((card) => (
         <Card key={card.label} padding="lg">
           <Stat value={card.value} label={card.label} icon={<Icon name={card.icon} />} />

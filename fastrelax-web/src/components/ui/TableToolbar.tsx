@@ -48,8 +48,18 @@ export function TableToolbar({
   children,
   className,
 }: TableToolbarProps) {
+  const primaryAction =
+    action ??
+    (actionLabel && (
+      <Button size="sm" leadingIcon={<Icon name={actionIcon} className="h-4 w-4" />}>
+        {actionLabel}
+      </Button>
+    ));
+
   return (
-    <div className={cn("flex flex-wrap items-center justify-end gap-2", className)}>
+    // No mobile a barra empilha: busca em uma linha, ações na seguinte. Espremer
+    // tudo lado a lado deixaria o campo estreito demais para digitar.
+    <div className={cn("flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end", className)}>
       {onSearchChange && (
         <Input
           name="q"
@@ -73,15 +83,15 @@ export function TableToolbar({
         />
       )}
 
-      {filter}
-      {children}
-
-      {action ??
-        (actionLabel && (
-          <Button size="sm" leadingIcon={<Icon name={actionIcon} className="h-4 w-4" />}>
-            {actionLabel}
-          </Button>
-        ))}
+      {/*
+        Os botões dividem a largura no mobile ([&>*]:flex-1) para virarem alvos
+        de toque largos, e voltam ao tamanho natural a partir de sm.
+      */}
+      <div className="flex items-center gap-2 [&>*]:flex-1 sm:[&>*]:flex-none">
+        {filter}
+        {children}
+        {primaryAction}
+      </div>
     </div>
   );
 }

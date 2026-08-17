@@ -49,7 +49,7 @@ public class CollaboratorService {
                 CollaboratorSpecifications.inDepartment(dto != null ? dto.departmentId() : null));
 
         return collaboratorRepository.findAll(spec, Objects.requireNonNull(pageable))
-                .map(this::toResponse);
+                .map(collaborator -> toResponse(collaborator));
     }
 
     public CollaboratorResponseDTO findById(Long id) {

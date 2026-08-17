@@ -35,7 +35,8 @@ public class ChairService {
                 ChairSpecifications.hasActive(dto != null ? dto.active() : null),
                 ChairSpecifications.isOnline(dto != null ? dto.online() : null, offlineAfterSeconds));
 
-        return chairRepository.findAll(spec, Objects.requireNonNull(pageable)).map(this::toResponse);
+        return chairRepository.findAll(spec, Objects.requireNonNull(pageable))
+                .map(chair -> toResponse(chair));
     }
 
     public ChairResponseDTO findById(Long id) {
@@ -123,6 +124,11 @@ public class ChairService {
      * Cadeira disponível para atender uma sessão. Hoje há uma só, então devolve a
      * primeira online; quando houver mais, este é o ponto que decide a alocação.
      */
+    /** Entidade crua, para quem precisa comandar o dispositivo. */
+    public Chair findEntity(Long id) {
+        return findEntityById(id);
+    }
+
     public Chair findAvailableChair() {
         return chairRepository.findByActiveTrue().stream()
                 .filter(chair -> chair.isOnline(offlineAfterSeconds))

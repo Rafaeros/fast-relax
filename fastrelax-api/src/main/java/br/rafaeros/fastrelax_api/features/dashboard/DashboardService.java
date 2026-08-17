@@ -60,7 +60,7 @@ public class DashboardService {
 
         Map<SessionStatus, Long> byStatus = new EnumMap<>(SessionStatus.class);
         for (CollaboratorSession session : sessions) {
-            byStatus.merge(session.getStatus(), 1L, Long::sum);
+            byStatus.merge(session.getStatus(), 1L, (current, increment) -> current + increment);
         }
 
         long done = byStatus.getOrDefault(SessionStatus.DONE, 0L);
@@ -89,20 +89,22 @@ public class DashboardService {
     }
 
     private long countActiveCollaborators() {
-        return collaboratorRepository.findAll().stream().filter(Collaborator::isActive).count();
+        return collaboratorRepository.findAll().stream()
+                .filter(collaborator -> collaborator.isActive())
+                .count();
     }
 
     /** Colaborador sem horário permitido configurado nunca consegue agendar — o RH precisa ver isso. */
     private long countCollaboratorsWithoutSchedule() {
         List<Long> withSchedule = scheduleRepository.findAll().stream()
-                .filter(CollaboratorWorkSchedule::isActive)
+                .filter(schedule -> schedule.isActive())
                 .map(schedule -> schedule.getCollaborator() != null ? schedule.getCollaborator().getId() : null)
                 .filter(id -> id != null)
                 .distinct()
                 .toList();
 
         return collaboratorRepository.findAll().stream()
-                .filter(Collaborator::isActive)
+                .filter(collaborator -> collaborator.isActive())
                 .filter(collaborator -> !withSchedule.contains(collaborator.getId()))
                 .count();
     }
@@ -123,7 +125,10 @@ public class DashboardService {
 
         List<DepartmentUsageDTO> result = new ArrayList<>();
         accumulators.values().forEach(accumulator -> result.add(accumulator.toDto()));
-        result.sort(Comparator.comparingLong(DepartmentUsageDTO::totalSessions).reversed());
+        // Lambda no lugar de method reference: este não carrega anotação de
+        // nulidade, e o compilador reclama da conversão do parâmetro implícito.
+        result.sort(Comparator.comparingLong((DepartmentUsageDTO usage) -> usage.totalSessions())
+                .reversed());
         return result;
     }
 
@@ -139,7 +144,7 @@ public class DashboardService {
                 accumulator.add(session.getStatus());
             }
         }
-        return accumulators.values().stream().map(DailyAccumulator::toDto).toList();
+        return accumulators.values().stream().map(accumulator -> accumulator.toDto()).toList();
     }
 
     private static final class DepartmentAccumulator {

@@ -7,11 +7,12 @@ import br.rafaeros.fastrelax_api.features.settings.SessionSettings;
 public record SessionSettingsResponseDTO(
     int defaultDurationMinutes,
     int startGraceMinutes,
+    int earlyStartMinutes,
     int maxAdvanceDays,
     LocalDateTime updatedAt
 ) {
     public SessionSettingsResponseDTO(SessionSettings entity) {
-        this(entity.getDefaultDurationMinutes(), entity.getStartGraceMinutes(), entity.getMaxAdvanceDays(),
-                entity.getUpdatedAt());
+        this(entity.getDefaultDurationMinutes(), entity.getStartGraceMinutes(),
+                entity.getEarlyStartMinutes(), entity.getMaxAdvanceDays(), entity.getUpdatedAt());
     }
 }

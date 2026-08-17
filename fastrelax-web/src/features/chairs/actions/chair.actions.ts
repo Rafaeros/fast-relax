@@ -6,6 +6,7 @@ import {
   createChair,
   deleteChair,
   listChairs,
+  testChairRelay,
   toggleChairActive,
   updateChair,
 } from "@/features/chairs/services/chair.service";
@@ -123,6 +124,20 @@ export async function toggleChairActiveAction(id: number): Promise<MutationResul
   const result = await toggleChairActive(id);
   if (result.ok) revalidatePath(ROUTE);
 
+  return { ok: result.ok, message: result.message };
+}
+
+/**
+ * Dispara o teste de relé.
+ *
+ * Sem `revalidatePath`: o acionamento não altera nenhum dado exibido na
+ * listagem, então recarregar a tabela seria trabalho à toa.
+ */
+export async function testChairRelayAction(
+  id: number,
+  durationSeconds = 10,
+): Promise<MutationResult> {
+  const result = await testChairRelay(id, durationSeconds);
   return { ok: result.ok, message: result.message };
 }
 

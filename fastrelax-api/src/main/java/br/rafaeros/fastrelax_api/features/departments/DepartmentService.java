@@ -28,7 +28,7 @@ public class DepartmentService {
                 DepartmentSpecifications.nameContains(dto != null ? dto.name() : null),
                 DepartmentSpecifications.hasActive(dto != null ? dto.active() : null));
         return departmentRepository.findAll(spec, Objects.requireNonNull(pageable))
-                .map(DepartmentResponseDTO::new);
+                .map(department -> new DepartmentResponseDTO(department));
     }
 
     public DepartmentResponseDTO findById(Long id) {

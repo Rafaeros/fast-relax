@@ -1,4 +1,5 @@
-import { Button, Container, Icon, Media, StatGroup } from "@/components/ui";
+import type { Route } from "next";
+import { ButtonLink, Container, Icon, Media, StatGroup } from "@/components/ui";
 import { assets } from "@/config/brand";
 
 const STATS = [
@@ -9,7 +10,9 @@ const STATS = [
 
 export function Hero() {
   return (
-    <section id="inicio" className="relative overflow-hidden pt-32 pb-20 sm:pt-40 sm:pb-28">
+    // pt menor no celular: a navbar tem 64px, e 128px de folga empurrava o
+    // título para fora da primeira dobra em telas de 640px de altura.
+    <section id="inicio" className="relative overflow-hidden pt-24 pb-14 sm:pt-40 sm:pb-28">
       {/* Fundo: foto do ambiente + brilho ambiente + fade para o corpo da página */}
       <div className="absolute inset-0 -z-10">
         <Media
@@ -26,11 +29,11 @@ export function Hero() {
       </div>
 
       <Container size="wide">
-        <div className="grid items-center gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
-          <div className="flex flex-col gap-7">
+        <div className="grid items-center gap-10 sm:gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
+          <div className="flex flex-col gap-5 sm:gap-7">
             <span className="eyebrow">Bem-estar corporativo</span>
 
-            <h1 className="font-display text-5xl leading-[1.05] text-ink-primary sm:text-6xl">
+            <h1 className="font-display text-[2.5rem] leading-[1.05] text-ink-primary sm:text-6xl">
               Descanso
               <br />
               <span className="text-gradient-accent">Redefinido.</span>
@@ -41,17 +44,30 @@ export function Hero() {
               colaborador e acompanhamento completo pelo RH.
             </p>
 
-            <div className="flex flex-wrap items-center gap-3">
-              <Button size="lg" trailingIcon={<Icon name="arrowRight" className="h-4 w-4" />}>
-                Conhecer a plataforma
-              </Button>
-              <Button
+            {/*
+              Empilhados e de largura total no celular: lado a lado, cada botão
+              ficava com metade de 335px e o rótulo quebrava em duas linhas.
+            */}
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+              <ButtonLink
+                href={"/colaborador/entrar" as Route}
+                size="lg"
+                fullWidth
+                className="sm:w-auto"
+                trailingIcon={<Icon name="arrowRight" className="h-4 w-4" />}
+              >
+                Agendar massagem
+              </ButtonLink>
+              <ButtonLink
+                href={"#plataforma" as Route}
                 variant="secondary"
                 size="lg"
+                fullWidth
+                className="sm:w-auto"
                 leadingIcon={<Icon name="play" className="h-4 w-4" />}
               >
-                Ver demonstração
-              </Button>
+                Conhecer a plataforma
+              </ButtonLink>
             </div>
 
             <div className="hairline mt-2 max-w-md" />

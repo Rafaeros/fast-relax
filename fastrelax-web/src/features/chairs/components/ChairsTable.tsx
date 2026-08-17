@@ -29,9 +29,15 @@ import type { Chair, ChairFilter } from "@/features/chairs/types/chair.types";
 export type ChairsTableProps = {
   initialSlice: PageSlice<Chair>;
   loadPage: (page: number, filter: ChairFilter) => Promise<PageSlice<Chair>>;
+  /**
+   * Resolvido no servidor e repassado até o modal de detalhes: o teste de relé
+   * é restrito a ADMIN. Esconder aqui é conveniência — quem barra de fato é o
+   * `@PreAuthorize` do backend.
+   */
+  isAdmin?: boolean;
 };
 
-export function ChairsTable({ initialSlice, loadPage }: ChairsTableProps) {
+export function ChairsTable({ initialSlice, loadPage, isAdmin = false }: ChairsTableProps) {
   // Incrementar o sinal faz a tabela descartar o que está em tela e recarregar
   // da primeira página — é assim que cadastro e edição aparecem na hora.
   const [reloadSignal, setReloadSignal] = useState(0);
@@ -171,6 +177,7 @@ export function ChairsTable({ initialSlice, loadPage }: ChairsTableProps) {
 
       <ViewChairModal
         chair={viewing}
+        isAdmin={isAdmin}
         onClose={() => setViewing(null)}
         onEdit={(chair) => {
           setViewing(null);

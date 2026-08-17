@@ -38,7 +38,9 @@ export function Section({
   return (
     <section
       className={cn(
-        "relative py-20 sm:py-28",
+        // No celular o respiro de 80px empurrava o conteúdo seguinte para longe
+        // demais — cada seção custava quase uma tela só de vazio.
+        "relative py-14 sm:py-20 lg:py-28",
         tone === "raised" ? "bg-surface-nav" : "bg-surface-base",
         className,
       )}
@@ -72,7 +74,7 @@ export function SectionHeading({
   return (
     <div
       className={cn(
-        "flex gap-6",
+        "flex gap-5 sm:gap-6",
         centered
           ? "flex-col items-center text-center"
           : "flex-col items-start sm:flex-row sm:items-end sm:justify-between",
@@ -83,7 +85,7 @@ export function SectionHeading({
         {eyebrow && <span className="eyebrow">{eyebrow}</span>}
         <h2
           className={cn(
-            "font-display text-3xl leading-tight text-ink-primary sm:text-4xl",
+            "font-display text-[1.75rem] leading-tight text-ink-primary sm:text-4xl",
             centered && "max-w-2xl",
           )}
         >

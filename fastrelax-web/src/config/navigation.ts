@@ -13,6 +13,55 @@ export type PanelNavItem = {
   description: string;
   href: Route;
   icon: IconName;
+  /**
+   * Aparece direto na barra de abas do mobile. Os demais ficam no menu "Mais".
+   *
+   * Uma barra de abas comporta de quatro a cinco destinos antes dos alvos de
+   * toque ficarem pequenos demais — daí a separação em vez de espremer tudo.
+   */
+  mobilePrimary?: boolean;
+};
+
+/**
+ * Navegação do app do colaborador.
+ *
+ * <p>
+ * Três destinos, todos primários: cabem na barra de abas do celular sem menu
+ * "Mais", e na sidebar do desktop sem agrupamento por seção.
+ */
+export const COLLABORATOR_NAV: PanelNavItem[] = [
+  {
+    section: "App",
+    label: "Início",
+    description: "Sua próxima massagem e seu histórico.",
+    href: "/colaborador" as Route,
+    mobilePrimary: true,
+    icon: "dashboard",
+  },
+  {
+    section: "App",
+    label: "Agendar",
+    description: "Escolha um horário livre na sua janela.",
+    href: "/colaborador/agenda" as Route,
+    mobilePrimary: true,
+    icon: "calendar",
+  },
+  {
+    section: "App",
+    label: "Perfil",
+    description: "Seus dados e horários permitidos.",
+    href: "/colaborador/perfil" as Route,
+    mobilePrimary: true,
+    icon: "users",
+  },
+];
+
+/** Rótulo curto para a barra de abas, onde o espaço é de um ícone. */
+export const MOBILE_TAB_LABELS: Partial<Record<string, string>> = {
+  "/painel": "Início",
+  "/painel/agenda": "Agenda",
+  "/painel/colaboradores": "Equipe",
+  "/painel/cadeiras": "Cadeiras",
 };
 
 /**
@@ -27,6 +76,7 @@ export const PANEL_NAV: PanelNavItem[] = [
     label: "Visão geral",
     description: "Indicadores, agenda do dia e status das cadeiras.",
     href: "/painel" as Route,
+    mobilePrimary: true,
     icon: "dashboard",
   },
   {
@@ -34,6 +84,7 @@ export const PANEL_NAV: PanelNavItem[] = [
     label: "Agenda",
     description: "Sessões dos colaboradores por mês.",
     href: "/painel/agenda" as Route,
+    mobilePrimary: true,
     icon: "calendar",
   },
   {
@@ -48,6 +99,7 @@ export const PANEL_NAV: PanelNavItem[] = [
     label: "Colaboradores",
     description: "Quem pode agendar e usar as cadeiras de massagem.",
     href: "/painel/colaboradores" as Route,
+    mobilePrimary: true,
     icon: "users",
   },
   {
@@ -62,6 +114,7 @@ export const PANEL_NAV: PanelNavItem[] = [
     label: "Cadeiras",
     description: "Dispositivos ESP32 que acionam as cadeiras de massagem.",
     href: "/painel/cadeiras" as Route,
+    mobilePrimary: true,
     icon: "chair",
   },
   {

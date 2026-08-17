@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import br.rafaeros.fastrelax_api.core.dto.ApiResponseDTO;
@@ -36,6 +37,7 @@ import lombok.RequiredArgsConstructor;
 public class ChairController {
 
     private final ChairService chairService;
+    private final ChairCommandService chairCommandService;
 
     /**
      * Batida periódica do ESP32. Autenticada pelo token de dispositivo, não por
@@ -83,6 +85,23 @@ public class ChairController {
             @RequestBody @Valid SaveChairRequestDTO dto) {
         return ResponseEntity.ok(ApiResponseDTO.success(chairService.update(id, dto),
                 "Cadeira atualizada com sucesso"));
+    }
+
+    /**
+     * Aciona o relé por alguns segundos, sem sessão.
+     *
+     * <p>
+     * Restrito a ADMIN: liga fisicamente a cadeira e não passa por nenhuma das
+     * regras de agendamento.
+     */
+    @PostMapping("/{id}/relay-test")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Liga o relé por alguns segundos para testar a instalação (somente ADMIN)")
+    public ResponseEntity<ApiResponseDTO<Void>> testRelay(@PathVariable Long id,
+            @RequestParam(name = "durationSeconds", defaultValue = "10") int durationSeconds) {
+        chairCommandService.testRelay(chairService.findEntity(id), durationSeconds);
+        return ResponseEntity.ok(ApiResponseDTO.success(
+                "Relé acionado por " + durationSeconds + "s. Verifique a cadeira."));
     }
 
     @PatchMapping("/{id}/toggle-active")

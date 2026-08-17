@@ -18,6 +18,12 @@ public record UpdateSessionSettingsRequestDTO(
     @Max(value = 60, message = "A tolerância deve ser de no máximo 60 minutos")
     Integer startGraceMinutes,
 
+    /** Quantos minutos antes do horário agendado a sessão já pode ser iniciada. */
+    @NotNull(message = "A antecedência de início é obrigatória")
+    @Min(value = 0, message = "A antecedência deve ser de no mínimo 0 minutos")
+    @Max(value = 60, message = "A antecedência deve ser de no máximo 60 minutos")
+    Integer earlyStartMinutes,
+
     /** Quantos dias à frente é possível agendar. */
     @NotNull(message = "A antecedência máxima é obrigatória")
     @Min(value = 1, message = "A antecedência deve ser de no mínimo 1 dia")

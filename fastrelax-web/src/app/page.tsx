@@ -1,5 +1,6 @@
 import { Footer } from "@/components/layout/Footer";
 import { Navbar } from "@/components/layout/Navbar";
+import { AccessAreas } from "@/components/landing/AccessAreas";
 import { Benefits } from "@/components/landing/Benefits";
 import { ContactCta } from "@/components/landing/ContactCta";
 import { Hero } from "@/components/landing/Hero";
@@ -17,6 +18,7 @@ export default function Home() {
         <Benefits />
         <Programs />
         <Platform />
+        <AccessAreas />
         <HowItWorks />
         <WhyChoose />
         <ContactCta />

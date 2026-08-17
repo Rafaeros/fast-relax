@@ -72,6 +72,23 @@ export async function toggleChairActive(id: number): Promise<ApiResult<Chair>> {
   });
 }
 
+/**
+ * Aciona o relé por alguns segundos, sem sessão.
+ *
+ * Diagnóstico de instalação: se o relé clica e a cadeira liga, um agendamento
+ * que falhou tem problema de software, não de fiação. Restrito a ADMIN no
+ * backend — liga fisicamente o equipamento.
+ */
+export async function testChairRelay(
+  id: number,
+  durationSeconds = 10,
+): Promise<ApiResult<null>> {
+  return apiFetch<null>(`${RESOURCE}/${id}/relay-test?durationSeconds=${durationSeconds}`, {
+    method: "POST",
+    token: await readAccessToken(),
+  });
+}
+
 /** Soft delete no backend — o registro sai das listagens. */
 export async function deleteChair(id: number): Promise<ApiResult<null>> {
   return apiFetch<null>(`${RESOURCE}/${id}`, {

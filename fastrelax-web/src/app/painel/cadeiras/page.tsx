@@ -4,6 +4,7 @@ import { emptyPageSlice, toPageSlice } from "@/lib/api/pagination.types";
 import { fetchChairsPage } from "@/features/chairs/actions/chair.actions";
 import { ChairsTable } from "@/features/chairs/components/ChairsTable";
 import { listChairs } from "@/features/chairs/services/chair.service";
+import { getCurrentUser } from "@/features/authentication/services/auth.service";
 import type { Chair } from "@/features/chairs/types/chair.types";
 
 export const metadata: Metadata = {
@@ -15,6 +16,10 @@ export default async function CadeirasPage() {
   const result = await listChairs({ page: 0 });
   const initialSlice = result.ok ? toPageSlice(result.data) : emptyPageSlice<Chair>();
 
+  // O perfil sai daqui porque o teste de relé só aparece para ADMIN. O layout
+  // do painel já garantiu que há sessão válida.
+  const user = await getCurrentUser();
+
   return (
     // Altura de uma tela: a lista rola dentro da tabela, o resto fica parado.
     <div className="flex h-full min-h-0 flex-col gap-4">
@@ -24,7 +29,11 @@ export default async function CadeirasPage() {
         </Alert>
       )}
 
-      <ChairsTable initialSlice={initialSlice} loadPage={fetchChairsPage} />
+      <ChairsTable
+        initialSlice={initialSlice}
+        loadPage={fetchChairsPage}
+        isAdmin={user?.role === "ADMIN"}
+      />
     </div>
   );
 }

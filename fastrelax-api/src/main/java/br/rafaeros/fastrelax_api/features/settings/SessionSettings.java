@@ -32,6 +32,7 @@ public class SessionSettings {
     /** Usados quando a tabela ainda não foi populada. */
     public static final int FALLBACK_DURATION_MINUTES = 5;
     public static final int FALLBACK_START_GRACE_MINUTES = 2;
+    public static final int FALLBACK_EARLY_START_MINUTES = 2;
     public static final int FALLBACK_MAX_ADVANCE_DAYS = 30;
 
     @Id
@@ -49,6 +50,14 @@ public class SessionSettings {
     @ColumnDefault("2")
     @Column(name = "start_grace_minutes", nullable = false)
     private int startGraceMinutes = FALLBACK_START_GRACE_MINUTES;
+
+    /**
+     * Minutos de antecedência tolerados para iniciar. Quem chega adiantado não
+     * fica esperando o relógio virar em frente à cadeira.
+     */
+    @ColumnDefault("2")
+    @Column(name = "early_start_minutes", nullable = false)
+    private int earlyStartMinutes = FALLBACK_EARLY_START_MINUTES;
 
     /** Quantos dias à frente o colaborador pode agendar, contando a partir de hoje. */
     @ColumnDefault("30")

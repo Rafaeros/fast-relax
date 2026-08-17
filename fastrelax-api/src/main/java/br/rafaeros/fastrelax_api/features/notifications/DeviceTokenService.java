@@ -31,7 +31,7 @@ public class DeviceTokenService {
         Collaborator collaborator = requireLoggedCollaborator();
 
         DeviceToken deviceToken = deviceTokenRepository.findByToken(dto.token())
-                .orElseGet(DeviceToken::new);
+                .orElseGet(() -> new DeviceToken());
 
         deviceToken.setToken(dto.token());
         deviceToken.setPlatform(dto.platform());
@@ -53,7 +53,7 @@ public class DeviceTokenService {
     public List<DeviceTokenResponseDTO> listMine() {
         Collaborator collaborator = requireLoggedCollaborator();
         return deviceTokenRepository.findByCollaboratorIdAndActiveTrue(collaborator.getId()).stream()
-                .map(DeviceTokenResponseDTO::new)
+                .map(token -> new DeviceTokenResponseDTO(token))
                 .toList();
     }
 

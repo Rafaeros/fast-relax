@@ -65,6 +65,18 @@ public class ChairClient {
         return send(chair, "/stop", Map.of("sessionId", sessionId));
     }
 
+    /**
+     * Aciona o relé por alguns segundos, sem sessão.
+     *
+     * <p>
+     * Diagnóstico de instalação: se o relé clica e a cadeira liga, um
+     * agendamento que falhou tem problema de software, não de fiação. O ESP32
+     * desliga sozinho ao fim da duração.
+     */
+    public boolean testRelay(Chair chair, int durationSeconds) {
+        return send(chair, "/relay-test", Map.of("durationSeconds", durationSeconds));
+    }
+
     private boolean send(Chair chair, String path, Map<String, Object> body) {
         if (chair.getIpAddress() == null) {
             log.warn("Cadeira {} sem IP conhecido; comando {} não enviado", chair.getName(), path);

@@ -184,7 +184,7 @@ public class GlobalExceptionHandler {
         Arrays.stream(ex.getStackTrace())
                 .limit(STACKTRACE_LINES)
                 .map(element -> String.valueOf(element))
-                .forEach(details::add);
+                .forEach(line -> details.add(line));
         return details;
     }
 }

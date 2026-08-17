@@ -6,9 +6,9 @@ package br.rafaeros.fastrelax_api.features.collaborators;
  * <pre>
  * SCHEDULED ──start──▶ STARTED ──finish──▶ DONE
  *     │                     │
+ *     │                     └──(chegou ao endTime)──▶ DONE
+ *     │
  *     ├──cancel──▶ CANCELLED ◀──cancel──┘
- *     │                     │
- *     │                     └──(não finalizou)──▶ EXPIRED
  *     │
  *     └──(não iniciou até a tolerância)──▶ EXPIRED
  * </pre>
@@ -18,8 +18,10 @@ package br.rafaeros.fastrelax_api.features.collaborators;
  * only one of them per collaborator at a time.
  *
  * <p>
- * {@link #EXPIRED} cobre os dois casos de abandono: não compareceu e não
- * finalizou. Em ambos o horário é devolvido para outra pessoa.
+ * {@link #EXPIRED} significa uma coisa só: não compareceu. Sessão iniciada que
+ * roda até o fim do horário vira {@link #DONE} mesmo sem ninguém apertar
+ * "finalizar" — a duração foi cumprida e o relé desligou sozinho. O
+ * {@code finish} manual serve para encerrar antes do previsto.
  */
 public enum SessionStatus {
     SCHEDULED("Agendada"),

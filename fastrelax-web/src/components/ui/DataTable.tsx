@@ -68,12 +68,16 @@ export function DataTable<TRow>({
   return (
     <Card padding="none" className={cn("flex min-h-0 flex-col", className)}>
       {hasHeader && (
-        <div className="flex shrink-0 flex-col gap-3 border-b border-line p-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex shrink-0 flex-col gap-3 border-b border-line p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
           <div className="flex flex-col gap-1">
-            {title && <h2 className="text-base font-semibold text-ink-primary">{title}</h2>}
+            {title && <h2 className="text-sm font-semibold text-ink-primary sm:text-base">{title}</h2>}
             {description && <p className="text-xs text-ink-tertiary">{description}</p>}
           </div>
-          {toolbar && <div className="flex items-center gap-2">{toolbar}</div>}
+          {/*
+            Largura total no mobile para a barra distribuir busca e ações em
+            linhas próprias; a partir de sm ela volta a ocupar só o necessário.
+          */}
+          {toolbar && <div className="w-full sm:w-auto">{toolbar}</div>}
         </div>
       )}
 

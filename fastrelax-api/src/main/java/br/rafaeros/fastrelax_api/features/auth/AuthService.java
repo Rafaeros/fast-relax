@@ -66,7 +66,7 @@ public class AuthService {
 
         if (consumed.getSubjectType() == RefreshToken.SubjectType.USER) {
             User user = userRepository.findById(consumed.getSubjectId())
-                    .filter(User::isEnabled)
+                    .filter(candidate -> candidate.isEnabled())
                     .orElseThrow(() -> new BusinessException("Usuário indisponível. Faça login novamente."));
             return new LoginResponseDTO(
                     tokenService.generateToken(user),
@@ -77,7 +77,7 @@ public class AuthService {
 
         // Revalida o estado atual: quem foi desativado depois do login não renova.
         Collaborator collaborator = collaboratorRepository.findById(consumed.getSubjectId())
-                .filter(Collaborator::isEnabled)
+                .filter(candidate -> candidate.isEnabled())
                 .orElseThrow(() -> new BusinessException(
                         "Seu acesso está desativado. Entre em contato com o RH."));
         // Colaborador não tem senha: o CPF é a credencial, então nunca há troca pendente.

@@ -69,7 +69,7 @@ public class CollaboratorSessionService {
                 CollaboratorSessionSpecifications.hasCollaborator(collaboratorId));
 
         return sessionRepository.findAll(spec, Objects.requireNonNull(pageable))
-                .map(CollaboratorSessionResponseDTO::new);
+                .map(session -> new CollaboratorSessionResponseDTO(session));
     }
 
     public CollaboratorSessionResponseDTO findById(Long id) {
@@ -88,7 +88,7 @@ public class CollaboratorSessionService {
 
         Long collaboratorId = resolveCollaboratorId(null);
         return sessionRepository.findByCollaboratorIdAndStatusIn(collaboratorId, ACTIVE_STATUSES)
-                .map(CollaboratorSessionResponseDTO::new);
+                .map(session -> new CollaboratorSessionResponseDTO(session));
     }
 
     /**
@@ -131,7 +131,7 @@ public class CollaboratorSessionService {
 
         List<AvailableDayDTO> days = new ArrayList<>();
         for (LocalDate date = start; !date.isAfter(end); date = date.plusDays(1)) {
-            buildDay(targetId, date, durationMinutes, busy).ifPresent(days::add);
+            buildDay(targetId, date, durationMinutes, busy).ifPresent(day -> days.add(day));
         }
 
         return new AvailableSlotsResponseDTO(start, end, durationMinutes, maxAdvanceDays, days);
@@ -169,8 +169,14 @@ public class CollaboratorSessionService {
         // Para enquanto o slot inteiro couber na janela permitida; o teste de isAfter também
         // encerra o laço se a soma cruzar a meia-noite.
         while (!slotEnd.isAfter(window.getAllowedEndTime()) && slotEnd.isAfter(slotStart)) {
-            slots.add(new SessionSlotDTO(slotStart, slotEnd,
-                    isSlotAvailable(slotStart, slotEnd, date, busyOnDate)));
+            // Horário que já passou some da grade em vez de aparecer desabilitado:
+            // não é escolha possível nem informação útil. Ocupado é diferente —
+            // continua na lista para a tela mostrar que o horário existe e está
+            // tomado por outra pessoa.
+            if (!hasPassed(slotStart, date)) {
+                slots.add(new SessionSlotDTO(slotStart, slotEnd,
+                        isFree(slotStart, slotEnd, busyOnDate)));
+            }
             slotStart = slotEnd;
             slotEnd = slotStart.plusMinutes(durationMinutes);
         }
@@ -370,9 +376,18 @@ public class CollaboratorSessionService {
         }
 
         LocalTime now = LocalTime.now();
-        if (now.isBefore(session.getStartTime())) {
+
+        // Quem chega adiantado pode começar antes: sem esta folga, a pessoa ficaria
+        // parada em frente à cadeira esperando o relógio virar.
+        LocalTime opensAt = session.getStartTime()
+                .minusMinutes(sessionSettingsService.getEarlyStartMinutes());
+        // opensAt depois do início significa virada de dia; nesse caso a janela
+        // abre à meia-noite e não há como estar adiantado.
+        boolean crossesMidnight = opensAt.isAfter(session.getStartTime());
+
+        if (!crossesMidnight && now.isBefore(opensAt)) {
             throw new BusinessException("A sessão só pode ser iniciada a partir das "
-                    + session.getStartTime().format(TIME_FORMAT) + ".");
+                    + opensAt.format(TIME_FORMAT) + ".");
         }
 
         LocalTime deadline = session.getStartTime()
@@ -414,11 +429,13 @@ public class CollaboratorSessionService {
         throw new BusinessException("Informe o parâmetro collaboratorId");
     }
 
-    private boolean isSlotAvailable(LocalTime slotStart, LocalTime slotEnd, LocalDate sessionDate,
-            List<CollaboratorSession> busy) {
-        if (sessionDate.isEqual(LocalDate.now()) && !slotStart.isAfter(LocalTime.now())) {
-            return false;
-        }
+    /** Horário do passado, contado só no dia de hoje — datas futuras nunca passaram. */
+    private boolean hasPassed(LocalTime slotStart, LocalDate sessionDate) {
+        return sessionDate.isEqual(LocalDate.now()) && !slotStart.isAfter(LocalTime.now());
+    }
+
+    /** Livre quando nenhuma sessão ativa se sobrepõe ao intervalo. */
+    private boolean isFree(LocalTime slotStart, LocalTime slotEnd, List<CollaboratorSession> busy) {
         return busy.stream().noneMatch(
                 session -> session.getStartTime().isBefore(slotEnd) && session.getEndTime().isAfter(slotStart));
     }

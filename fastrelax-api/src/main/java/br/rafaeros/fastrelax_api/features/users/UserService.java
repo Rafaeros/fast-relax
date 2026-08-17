@@ -52,7 +52,7 @@ public class UserService {
     }
 
     public Page<UserResponseDTO> findAllUsers(Pageable pageable) {
-        return userRepository.findAll(Objects.requireNonNull(pageable)).map(UserResponseDTO::new);
+        return userRepository.findAll(Objects.requireNonNull(pageable)).map(user -> new UserResponseDTO(user));
     }
 
     public UserResponseDTO findUserById(Long id) {

@@ -52,6 +52,27 @@ public class ChairCommandService {
      * fora do ar. O ESP32 desliga sozinho ao fim da duração, então uma falha aqui
      * atrasa o desligamento, não o impede.
      */
+    /**
+     * Aciona o relé de uma cadeira específica, sem sessão, para conferir a
+     * instalação elétrica.
+     *
+     * <p>
+     * Diferente de {@link #startFor}, não escolhe a cadeira nem exige que ela
+     * esteja online no critério de heartbeat: o objetivo é justamente descobrir
+     * por que uma cadeira não responde. Basta ter IP conhecido.
+     */
+    public void testRelay(Chair chair, int durationSeconds) {
+        if (chair.getIpAddress() == null) {
+            throw new BusinessException(
+                    "A cadeira ainda não informou o endereço de rede. Ligue o dispositivo e aguarde o primeiro sinal.");
+        }
+        if (!chairClient.testRelay(chair, durationSeconds)) {
+            throw new BusinessException(
+                    "A cadeira não respondeu ao teste. Verifique se está ligada e na mesma rede.");
+        }
+        log.info("Teste de relé disparado na cadeira {} por {}s", chair.getName(), durationSeconds);
+    }
+
     public void stopFor(Chair chair, Long sessionId) {
         if (chair == null) {
             return;

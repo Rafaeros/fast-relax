@@ -28,7 +28,9 @@ export type StatGroupProps = {
 
 export function StatGroup({ items, className }: StatGroupProps) {
   return (
-    <dl className={cn("flex flex-wrap gap-x-10 gap-y-6", className)}>
+    // Grade no celular: com flex-wrap o terceiro item caía sozinho numa linha
+    // e desalinhava do par acima.
+    <dl className={cn("grid grid-cols-3 gap-x-4 gap-y-6 sm:flex sm:flex-wrap sm:gap-x-10", className)}>
       {items.map((item) => (
         <Stat key={item.label} {...item} />
       ))}
