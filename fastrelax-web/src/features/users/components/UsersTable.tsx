@@ -10,6 +10,7 @@ import {
   TableIdentity,
   TableToolbar,
   ViewAction,
+  useToast,
 } from "@/components/ui";
 import type { DataTableColumn } from "@/components/ui";
 import type { PageSlice } from "@/lib/api/pagination.types";
@@ -37,6 +38,7 @@ export function UsersTable({ initialSlice, loadPage }: UsersTableProps) {
   // e montar um diálogo por registro encheria o DOM à toa.
   const [viewing, setViewing] = useState<User | null>(null);
   const [editing, setEditing] = useState<User | null>(null);
+  const toast = useToast();
 
   const reload = () => setReloadSignal((current) => current + 1);
 
@@ -106,15 +108,22 @@ export function UsersTable({ initialSlice, loadPage }: UsersTableProps) {
               itemName={row.name}
               description="O usuário perde o acesso ao painel."
               onConfirm={async () => {
-                await deleteUserAction(row.id);
-                reload();
+                const result = await deleteUserAction(row.id);
+                // A recusa do backend (excluir a si mesmo, por exemplo) passava
+                // despercebida: a lista só voltava intacta.
+                if (result.ok) {
+                  reload();
+                  toast.success(result.message);
+                } else {
+                  toast.error(result.message);
+                }
               }}
             />
           </RowActions>
         ),
       },
     ],
-    [],
+    [toast],
   );
 
   return (

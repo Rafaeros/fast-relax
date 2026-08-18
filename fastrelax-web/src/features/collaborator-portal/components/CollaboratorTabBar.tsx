@@ -10,12 +10,13 @@ import { cn } from "@/lib/cn";
 type Tab = { href: Route; label: string; icon: IconName };
 
 /**
- * Três destinos, o que cabe folgado numa barra de abas — cada aba fica larga e
- * o alvo de toque é generoso.
+ * Quatro destinos: o teto de uma barra de abas antes de o alvo de toque ficar
+ * apertado. Passar disso exigiria um menu "Mais", como no painel do RH.
  */
 const TABS: Tab[] = [
   { href: "/colaborador" as Route, label: "Início", icon: "dashboard" },
   { href: "/colaborador/agenda" as Route, label: "Agendar", icon: "calendar" },
+  { href: "/colaborador/notificacoes" as Route, label: "Avisos", icon: "bell" },
   { href: "/colaborador/perfil" as Route, label: "Perfil", icon: "users" },
 ];
 

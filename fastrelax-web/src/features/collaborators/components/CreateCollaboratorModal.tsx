@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, type FormEvent } from "react";
-import { Alert, Button, Icon, Modal } from "@/components/ui";
+import { Alert, Button, Icon, Modal, useToast } from "@/components/ui";
 import { createCollaboratorAction } from "@/features/collaborators/actions/collaborator.actions";
 import { AllowedWindowsField } from "@/features/collaborators/components/AllowedWindowsField";
 import { CollaboratorFormFields } from "@/features/collaborators/components/CollaboratorFormFields";
@@ -24,6 +24,7 @@ export function CreateCollaboratorModal({
   // Trocar a key remonta o formulário: campos com estado próprio (as máscaras
   // de CPF e telefone) voltam a zero, o que `form.reset()` não faria.
   const [formKey, setFormKey] = useState(0);
+  const toast = useToast();
 
   const fieldErrors = state.fieldErrors ?? {};
   const noDepartments = departments.length === 0;
@@ -54,9 +55,13 @@ export function CreateCollaboratorModal({
         resetForm();
         setOpen(false);
         onCreated();
+        if (result.message) toast.success(result.message);
         return;
       }
 
+      // Erro de campo fica no formulário, ao lado do input a corrigir. O recado
+      // geral do servidor vai para o toast, que não depende do modal aberto.
+      if (result.message && !result.fieldErrors) toast.error(result.message);
       setState(result);
     });
   };
@@ -105,10 +110,6 @@ export function CreateCollaboratorModal({
           className="flex flex-col gap-5"
           noValidate
         >
-          {state.status === "error" && state.message && (
-            <Alert tone="error">{state.message}</Alert>
-          )}
-
           {noDepartments && (
             <Alert tone="warning" title="Nenhum departamento cadastrado">
               Cadastre um departamento antes de incluir colaboradores.

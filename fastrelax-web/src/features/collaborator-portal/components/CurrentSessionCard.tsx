@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useTransition } from "react";
 import Link from "next/link";
 import type { Route } from "next";
-import { Alert, Badge, Button, ButtonLink, Card, Icon } from "@/components/ui";
+import { Badge, Button, ButtonLink, Card, Icon, useToast } from "@/components/ui";
 import { formatSessionDate, formatTimeRange } from "@/features/collaborator-portal/lib/format";
 import {
   cancelSessionAction,
@@ -25,12 +25,20 @@ export type CurrentSessionCardProps = {
  * ações possíveis (iniciar, finalizar, cancelar) conforme o estado atual.
  */
 export function CurrentSessionCard({ session }: CurrentSessionCardProps) {
-  const [feedback, setFeedback] = useState<{ ok: boolean; message: string } | null>(null);
   const [pending, startTransition] = useTransition();
+  const { success, error } = useToast();
 
   const run = (action: () => Promise<{ ok: boolean; message: string }>) => {
-    setFeedback(null);
-    startTransition(async () => setFeedback(await action()));
+    startTransition(async () => {
+      // O cartão se redesenha com o novo estado da sessão logo depois da ação,
+      // então o aviso vai para o toast em vez de disputar espaço aqui dentro.
+      const result = await action();
+      if (result.ok) {
+        success(result.message);
+      } else {
+        error(result.message);
+      }
+    });
   };
 
   if (!session) {
@@ -90,8 +98,6 @@ export function CurrentSessionCard({ session }: CurrentSessionCardProps) {
           </div>
         )}
       </dl>
-
-      {feedback && <Alert tone={feedback.ok ? "success" : "error"}>{feedback.message}</Alert>}
 
       <div className="flex flex-col gap-2 sm:flex-row">
         {started ? (

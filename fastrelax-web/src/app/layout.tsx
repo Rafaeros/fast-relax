@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Playfair_Display } from "next/font/google";
 import "./globals.css";
+import { ToastProvider } from "@/components/ui";
 import { brand } from "@/config/brand";
 
 const geistSans = Geist({
@@ -48,7 +49,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="pt-BR"
       className={`${geistSans.variable} ${geistMono.variable} ${displaySerif.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col font-sans">{children}</body>
+      <body className="min-h-full flex flex-col font-sans">
+        {/* No topo da árvore: qualquer tela pode avisar sem montar o próprio
+            container de mensagens. */}
+        <ToastProvider>{children}</ToastProvider>
+      </body>
     </html>
   );
 }

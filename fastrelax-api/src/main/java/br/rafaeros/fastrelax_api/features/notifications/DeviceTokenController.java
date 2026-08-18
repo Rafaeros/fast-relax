@@ -28,6 +28,25 @@ import lombok.RequiredArgsConstructor;
 public class DeviceTokenController {
 
     private final DeviceTokenService deviceTokenService;
+    private final br.rafaeros.fastrelax_api.features.notifications.push.WebPushProvider webPushProvider;
+
+    /**
+     * Chave pública VAPID.
+     *
+     * <p>
+     * O navegador precisa dela para se inscrever, e ela é pública por definição —
+     * serve para o serviço de push conferir que quem envia é este servidor. Vem
+     * por rota em vez de embutida no frontend para os dois lados não saírem do
+     * ar juntos quando o par de chaves for trocado.
+     */
+    @GetMapping("/vapid-public-key")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Chave pública VAPID usada pelo navegador para se inscrever no Web Push")
+    public ResponseEntity<ApiResponseDTO<java.util.Map<String, String>>> vapidPublicKey() {
+        return ResponseEntity.ok(ApiResponseDTO.success(
+                java.util.Map.of("publicKey", webPushProvider.getPublicKey()),
+                webPushProvider.isEnabled() ? "Chave disponível" : "Web Push não configurado no servidor"));
+    }
 
     @PostMapping
     @PreAuthorize("isAuthenticated()")
@@ -51,5 +70,14 @@ public class DeviceTokenController {
     public ResponseEntity<ApiResponseDTO<Void>> unregister(@RequestParam("token") String token) {
         deviceTokenService.unregister(token);
         return ResponseEntity.ok(ApiResponseDTO.success("Dispositivo removido"));
+    }
+
+    @DeleteMapping("/subscription")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Desativa a inscrição de Web Push do navegador")
+    public ResponseEntity<ApiResponseDTO<Void>> unregisterSubscription(
+            @RequestParam("endpoint") String endpoint) {
+        deviceTokenService.unregisterSubscription(endpoint);
+        return ResponseEntity.ok(ApiResponseDTO.success("Inscrição removida"));
     }
 }

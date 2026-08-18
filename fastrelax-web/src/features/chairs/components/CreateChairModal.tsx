@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, type FormEvent } from "react";
-import { Alert, Button, Icon, Modal } from "@/components/ui";
+import { Button, Icon, Modal, useToast } from "@/components/ui";
 import { createChairAction } from "@/features/chairs/actions/chair.actions";
 import { ChairFormFields } from "@/features/chairs/components/ChairFormFields";
 import { CHAIR_INITIAL_STATE } from "@/features/chairs/types/chair.types";
@@ -17,6 +17,7 @@ export function CreateChairModal({ onCreated }: CreateChairModalProps) {
   const [pending, startTransition] = useTransition();
   // Trocar a key remonta o formulário e zera os campos para o próximo cadastro.
   const [formKey, setFormKey] = useState(0);
+  const toast = useToast();
 
   const fieldErrors = state.fieldErrors ?? {};
 
@@ -41,9 +42,13 @@ export function CreateChairModal({ onCreated }: CreateChairModalProps) {
         resetForm();
         setOpen(false);
         onCreated();
+        if (result.message) toast.success(result.message);
         return;
       }
 
+      // Erro de campo fica no formulário, ao lado do input a corrigir. O recado
+      // geral do servidor vai para o toast, que não depende do modal aberto.
+      if (result.message && !result.fieldErrors) toast.error(result.message);
       setState(result);
     });
   };
@@ -87,10 +92,6 @@ export function CreateChairModal({ onCreated }: CreateChairModalProps) {
           className="flex flex-col gap-5"
           noValidate
         >
-          {state.status === "error" && state.message && (
-            <Alert tone="error">{state.message}</Alert>
-          )}
-
           <ChairFormFields fieldErrors={fieldErrors} disabled={pending} />
         </form>
       </Modal>

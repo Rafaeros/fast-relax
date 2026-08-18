@@ -106,6 +106,27 @@
 			<version>5.4.0</version>
 		</dependency>
 
+		<!-- PUSH ANDROID/iOS (Firebase Cloud Messaging) -->
+		<dependency>
+			<groupId>com.google.firebase</groupId>
+			<artifactId>firebase-admin</artifactId>
+			<version>9.4.1</version>
+		</dependency>
+
+		<!-- PUSH WEB (Web Push protocol + VAPID) -->
+		<dependency>
+			<groupId>nl.martijndwars</groupId>
+			<artifactId>web-push</artifactId>
+			<version>5.1.1</version>
+		</dependency>
+
+		<!-- Criptografia do Web Push (curvas elípticas usadas pelo VAPID) -->
+		<dependency>
+			<groupId>org.bouncycastle</groupId>
+			<artifactId>bcprov-jdk18on</artifactId>
+			<version>1.78.1</version>
+		</dependency>
+
 		<!-- DOCUMENTAÇÃO OPENAPI / SWAGGER UI -->
 		<dependency>
 			<groupId>org.springdoc</groupId>

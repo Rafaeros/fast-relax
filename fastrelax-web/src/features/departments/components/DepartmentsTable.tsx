@@ -10,6 +10,7 @@ import {
   TableIdentity,
   TableToolbar,
   ViewAction,
+  useToast,
 } from "@/components/ui";
 import type { DataTableColumn } from "@/components/ui";
 import type { PageSlice } from "@/lib/api/pagination.types";
@@ -42,6 +43,7 @@ export function DepartmentsTable({ initialSlice, loadPage }: DepartmentsTablePro
   // e montar um diálogo por registro encheria o DOM à toa.
   const [viewing, setViewing] = useState<Department | null>(null);
   const [editing, setEditing] = useState<Department | null>(null);
+  const toast = useToast();
 
   const reload = () => setReloadSignal((current) => current + 1);
 
@@ -103,15 +105,22 @@ export function DepartmentsTable({ initialSlice, loadPage }: DepartmentsTablePro
               itemName={row.name}
               description="Colaboradores vinculados perdem a referência de departamento."
               onConfirm={async () => {
-                await deleteDepartmentAction(row.id);
-                reload();
+                const result = await deleteDepartmentAction(row.id);
+                // A recusa do backend (departamento com colaboradores, por
+                // exemplo) passava despercebida: a lista só voltava intacta.
+                if (result.ok) {
+                  reload();
+                  toast.success(result.message);
+                } else {
+                  toast.error(result.message);
+                }
               }}
             />
           </RowActions>
         ),
       },
     ],
-    [],
+    [toast],
   );
 
   return (

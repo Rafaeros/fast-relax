@@ -18,7 +18,10 @@ public class SchedulingConfig {
     @Bean
     ThreadPoolTaskScheduler taskScheduler() {
         ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
-        scheduler.setPoolSize(3);
+        // Uma thread por tarefa agendada: monitor de cadeiras, expiração de
+        // sessões, lembretes rolantes e resumo diário. Com o pool menor que a
+        // contagem, uma tarefa lenta atrasaria outra sem relação com ela.
+        scheduler.setPoolSize(5);
         scheduler.setThreadNamePrefix("fastrelax-job-");
         // Espera as tarefas em andamento no shutdown: interromper no meio poderia
         // deixar uma sessão marcada sem o relé ter sido desligado.

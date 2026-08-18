@@ -6,10 +6,12 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.web.client.RestClientCustomizer;
+import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * Único ponto de comunicação com o ESP32.
@@ -25,15 +27,18 @@ public class ChairClient {
     private static final Logger log = LoggerFactory.getLogger(ChairClient.class);
 
     private final RestClient restClient;
+    private final ObjectMapper objectMapper;
     private final String deviceToken;
     private final int startDelaySeconds;
 
     public ChairClient(
             @Value("${app.chair.request-timeout-ms:3000}") int requestTimeoutMs,
             @Value("${app.chair.device-token:}") String deviceToken,
-            @Value("${app.chair.start-delay-seconds:5}") int startDelaySeconds) {
+            @Value("${app.chair.start-delay-seconds:5}") int startDelaySeconds,
+            ObjectMapper objectMapper) {
         this.deviceToken = deviceToken;
         this.startDelaySeconds = startDelaySeconds;
+        this.objectMapper = objectMapper;
 
         // Timeout curto de propósito: o colaborador está esperando na frente da
         // cadeira, e uma requisição pendurada seria pior que um erro imediato.
@@ -84,10 +89,18 @@ public class ChairClient {
         }
         String url = chair.baseUrl() + path;
         try {
+            // O JSON é serializado aqui, e não entregue como Map, por causa do
+            // ESP32: passando o objeto, o Spring não sabe o tamanho final e
+            // envia em `Transfer-Encoding: chunked`, sem `Content-Length`. O
+            // WebServer do ESP32 lê o corpo pelo Content-Length — sem ele,
+            // `server.arg("plain")` chega vazio e o firmware recusa o comando.
+            String json = objectMapper.writeValueAsString(body);
+
             restClient.post()
                     .uri(url)
                     .header("X-Device-Token", deviceToken)
-                    .body(body)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(json)
                     .retrieve()
                     .toBodilessEntity();
             log.info("Comando {} enviado para a cadeira {} ({})", path, chair.getName(), url);

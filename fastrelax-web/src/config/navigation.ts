@@ -26,8 +26,9 @@ export type PanelNavItem = {
  * Navegação do app do colaborador.
  *
  * <p>
- * Três destinos, todos primários: cabem na barra de abas do celular sem menu
- * "Mais", e na sidebar do desktop sem agrupamento por seção.
+ * Quatro destinos, todos primários: é o limite que a barra de abas do celular
+ * comporta sem menu "Mais", e na sidebar do desktop dispensa agrupamento por
+ * seção.
  */
 export const COLLABORATOR_NAV: PanelNavItem[] = [
   {
@@ -45,6 +46,14 @@ export const COLLABORATOR_NAV: PanelNavItem[] = [
     href: "/colaborador/agenda" as Route,
     mobilePrimary: true,
     icon: "calendar",
+  },
+  {
+    section: "App",
+    label: "Notificações",
+    description: "Avisos sobre suas massagens.",
+    href: "/colaborador/notificacoes" as Route,
+    mobilePrimary: true,
+    icon: "bell",
   },
   {
     section: "App",

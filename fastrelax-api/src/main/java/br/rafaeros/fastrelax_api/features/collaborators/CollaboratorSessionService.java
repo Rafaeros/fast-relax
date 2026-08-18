@@ -46,6 +46,7 @@ public class CollaboratorSessionService {
     private final SessionSettingsService sessionSettingsService;
     private final SessionExpirationService sessionExpirationService;
     private final br.rafaeros.fastrelax_api.features.chairs.ChairCommandService chairCommandService;
+    private final org.springframework.context.ApplicationEventPublisher events;
 
     public Page<CollaboratorSessionResponseDTO> findAll(CollaboratorSessionFilterDTO dto,
             @org.springframework.lang.NonNull Pageable pageable) {
@@ -210,7 +211,9 @@ public class CollaboratorSessionService {
         // O status nunca vem do cliente: toda sessão nasce agendada.
         session.setStatus(SessionStatus.SCHEDULED);
 
-        return new CollaboratorSessionResponseDTO(sessionRepository.save(session));
+        CollaboratorSession saved = sessionRepository.save(session);
+        events.publishEvent(SessionLifecycleEvent.of(SessionLifecycleEvent.Type.SCHEDULED, saved));
+        return new CollaboratorSessionResponseDTO(saved);
     }
 
     /** Reagenda uma sessão que ainda não começou. Não muda de estado nem de dono. */
@@ -218,7 +221,7 @@ public class CollaboratorSessionService {
     public CollaboratorSessionResponseDTO update(Long id, CollaboratorSessionDTO dto) {
         CollaboratorSession session = findEntityById(Objects.requireNonNull(id));
         if (session.getStatus() != SessionStatus.SCHEDULED) {
-            throw new BusinessException("Só é possível reagendar sessões com status SCHEDULED");
+            throw new BusinessException("Só é possível reagendar massagens que ainda não começaram.");
         }
 
         // A duração é reaplicada no reagendamento, então mudanças de configuração
@@ -245,15 +248,35 @@ public class CollaboratorSessionService {
         requireStatus(session, SessionStatus.SCHEDULED, "iniciada");
         validateStartWindow(session);
 
-        // Aciona a cadeira antes de gravar: se o relé não ligar, a sessão continua
-        // agendada e o colaborador pode tentar de novo dentro da tolerância.
+        return beginSession(session);
+    }
+
+    /**
+     * Liga a cadeira e marca a sessão como em andamento.
+     *
+     * <p>
+     * As duas rotas de início — por id e "a minha de agora" — terminam aqui. Elas
+     * diferem só em como descobrem a sessão; o que acontece depois tem que ser
+     * idêntico, e manter isso em um lugar só é o que impede uma delas de voltar a
+     * marcar a sessão sem acionar o relé.
+     *
+     * <p>
+     * A cadeira é acionada antes de gravar: se o relé não ligar, a sessão continua
+     * agendada e o colaborador pode tentar de novo dentro da tolerância — melhor
+     * que ficar com o app dizendo "em andamento" na frente de um equipamento
+     * parado.
+     */
+    private CollaboratorSessionResponseDTO beginSession(CollaboratorSession session) {
         int durationSeconds = (int) java.time.Duration
                 .between(session.getStartTime(), session.getEndTime()).getSeconds();
         session.setChair(chairCommandService.startFor(session.getId(), durationSeconds));
 
         session.setStatus(SessionStatus.STARTED);
         session.setStartedAt(LocalDateTime.now());
-        return new CollaboratorSessionResponseDTO(sessionRepository.save(session));
+
+        CollaboratorSession saved = sessionRepository.save(session);
+        events.publishEvent(SessionLifecycleEvent.of(SessionLifecycleEvent.Type.STARTED, saved));
+        return new CollaboratorSessionResponseDTO(saved);
     }
 
     /**
@@ -287,9 +310,7 @@ public class CollaboratorSessionService {
 
         validateStartWindow(session);
 
-        session.setStatus(SessionStatus.STARTED);
-        session.setStartedAt(LocalDateTime.now());
-        return new CollaboratorSessionResponseDTO(sessionRepository.save(session));
+        return beginSession(session);
     }
 
     /** Só faz sentido para colaborador: ADMIN e RH não têm sessão própria. */
@@ -310,7 +331,10 @@ public class CollaboratorSessionService {
 
         session.setStatus(SessionStatus.DONE);
         session.setFinishedAt(LocalDateTime.now());
-        return new CollaboratorSessionResponseDTO(sessionRepository.save(session));
+
+        CollaboratorSession saved = sessionRepository.save(session);
+        events.publishEvent(SessionLifecycleEvent.of(SessionLifecycleEvent.Type.FINISHED, saved));
+        return new CollaboratorSessionResponseDTO(saved);
     }
 
     @Transactional
@@ -327,7 +351,10 @@ public class CollaboratorSessionService {
         }
 
         session.setStatus(SessionStatus.CANCELLED);
-        return new CollaboratorSessionResponseDTO(sessionRepository.save(session));
+
+        CollaboratorSession saved = sessionRepository.save(session);
+        events.publishEvent(SessionLifecycleEvent.of(SessionLifecycleEvent.Type.CANCELLED, saved));
+        return new CollaboratorSessionResponseDTO(saved);
     }
 
     private CollaboratorSession findEntityById(Long id) {
@@ -357,8 +384,13 @@ public class CollaboratorSessionService {
     private void requireNoActiveSession(Long collaboratorId) {
         sessionRepository.findByCollaboratorIdAndStatusIn(collaboratorId, ACTIVE_STATUSES)
                 .ifPresent(active -> {
-                    throw new BusinessException("Colaborador já possui uma sessão " + active.getStatus()
-                            + " em " + active.getSessionDate() + " às " + active.getStartTime());
+                    // Label e data em pt-BR: a mensagem é exibida direto ao
+                    // colaborador, e o nome do enum não diz nada para ele.
+                    throw new BusinessException("Você já tem uma massagem "
+                            + active.getStatus().getLabel().toLowerCase() + " em "
+                            + active.getSessionDate().format(DATE_FORMAT) + " às "
+                            + active.getStartTime().format(TIME_FORMAT)
+                            + ". Cancele antes de marcar outra.");
                 });
     }
 
@@ -401,8 +433,8 @@ public class CollaboratorSessionService {
 
     private void requireStatus(CollaboratorSession session, SessionStatus expected, String action) {
         if (session.getStatus() != expected) {
-            throw new BusinessException("Sessão com status " + session.getStatus()
-                    + " não pode ser " + action + "; era esperado " + expected);
+            throw new BusinessException("Esta massagem está " + session.getStatus().getLabel().toLowerCase()
+                    + " e não pode ser " + action + ".");
         }
     }
 

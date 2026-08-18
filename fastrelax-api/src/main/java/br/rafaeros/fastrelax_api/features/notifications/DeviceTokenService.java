@@ -30,15 +30,25 @@ public class DeviceTokenService {
     public DeviceTokenResponseDTO register(RegisterDeviceTokenDTO dto) {
         Collaborator collaborator = requireLoggedCollaborator();
 
-        DeviceToken deviceToken = deviceTokenRepository.findByToken(dto.token())
-                .orElseGet(() -> new DeviceToken());
+        // Cada tecnologia tem sua identidade: FCM identifica pelo token, Web Push
+        // pelo endpoint da inscrição. Procurar pela chave certa é o que faz o
+        // registro repetido atualizar a linha em vez de duplicá-la.
+        DeviceToken deviceToken = findExisting(dto).orElseGet(() -> new DeviceToken());
 
         deviceToken.setToken(dto.token());
+        deviceToken.setPushSubscription(dto.pushSubscription());
         deviceToken.setPlatform(dto.platform());
         deviceToken.setCollaborator(collaborator);
         deviceToken.setActive(true);
 
         return new DeviceTokenResponseDTO(deviceTokenRepository.save(deviceToken));
+    }
+
+    private java.util.Optional<DeviceToken> findExisting(RegisterDeviceTokenDTO dto) {
+        if (dto.platform() == DeviceToken.Platform.WEB) {
+            return deviceTokenRepository.findBySubscriptionEndpoint(dto.pushSubscription().endpoint());
+        }
+        return deviceTokenRepository.findByToken(dto.token());
     }
 
     /** Logout do aparelho: para de receber push sem apagar o histórico. */
@@ -50,17 +60,25 @@ public class DeviceTokenService {
         });
     }
 
+    /**
+     * Desfaz a inscrição do navegador.
+     *
+     * <p>
+     * Separado do {@link #unregister(String)} porque o navegador não tem token
+     * para devolver: o que ele conhece da própria inscrição é o endpoint.
+     */
+    @Transactional
+    public void unregisterSubscription(String endpoint) {
+        deviceTokenRepository.findBySubscriptionEndpoint(endpoint).ifPresent(deviceToken -> {
+            deviceToken.setActive(false);
+            deviceTokenRepository.save(deviceToken);
+        });
+    }
+
     public List<DeviceTokenResponseDTO> listMine() {
         Collaborator collaborator = requireLoggedCollaborator();
         return deviceTokenRepository.findByCollaboratorIdAndActiveTrue(collaborator.getId()).stream()
                 .map(token -> new DeviceTokenResponseDTO(token))
-                .toList();
-    }
-
-    /** Destinos de push de um colaborador — ponto de entrada para o envio via FCM. */
-    public List<String> activeTokensFor(Long collaboratorId) {
-        return deviceTokenRepository.findByCollaboratorIdAndActiveTrue(collaboratorId).stream()
-                .map(deviceToken -> deviceToken.getToken())
                 .toList();
     }
 

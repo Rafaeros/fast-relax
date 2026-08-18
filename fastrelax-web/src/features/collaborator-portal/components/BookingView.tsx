@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Alert, Button, Card, Icon } from "@/components/ui";
+import { Button, Card, Icon, useToast } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { bookSessionAction } from "@/features/collaborator-portal/actions/portal.actions";
 import { formatTime, isToday, parseApiDate } from "@/features/collaborator-portal/lib/format";
@@ -23,16 +23,21 @@ const WEEKDAY_SHORT = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
  */
 export function BookingView({ collaboratorId, slots }: BookingViewProps) {
   const [selectedDate, setSelectedDate] = useState(slots.days[0]?.sessionDate ?? "");
-  const [feedback, setFeedback] = useState<{ ok: boolean; message: string } | null>(null);
   const [pending, startTransition] = useTransition();
+  const { success, error } = useToast();
 
   const selectedDay = slots.days.find((day) => day.sessionDate === selectedDate);
 
   const book = (startTime: string) => {
-    setFeedback(null);
     startTransition(async () => {
       const result = await bookSessionAction(collaboratorId, selectedDate, startTime);
-      setFeedback(result);
+      // Resposta do servidor vai para o toast: a grade recarrega abaixo e um
+      // aviso empurrando os horários mudaria o alvo do toque no meio da ação.
+      if (result.ok) {
+        success(result.message);
+      } else {
+        error(result.message);
+      }
     });
   };
 
@@ -108,8 +113,6 @@ export function BookingView({ collaboratorId, slots }: BookingViewProps) {
             </span>
           )}
         </div>
-
-        {feedback && <Alert tone={feedback.ok ? "success" : "error"}>{feedback.message}</Alert>}
 
         {selectedDay && (
           // Grade fluida: três colunas no celular, mais conforme a tela cresce.

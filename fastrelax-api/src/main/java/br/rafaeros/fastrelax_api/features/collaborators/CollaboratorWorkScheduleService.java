@@ -142,7 +142,8 @@ public class CollaboratorWorkScheduleService {
                 .orElse(null);
 
         if (schedule != null && schedule.getDeletedAt() == null) {
-            throw new BusinessException("Este colaborador já possui horário cadastrado para " + dto.dayOfWeek());
+            throw new BusinessException(
+                    "Este colaborador já possui horário cadastrado para " + dto.dayOfWeek().getLabel() + ".");
         }
         if (schedule == null) {
             schedule = new CollaboratorWorkSchedule();

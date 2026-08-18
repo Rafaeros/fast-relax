@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, type FormEvent } from "react";
-import { Alert, Button, Icon, Modal } from "@/components/ui";
+import { Button, Icon, Modal, useToast } from "@/components/ui";
 import { updateUserAction } from "@/features/users/actions/user.actions";
 import { UserFormFields } from "@/features/users/components/UserFormFields";
 import { USER_INITIAL_STATE, type User } from "@/features/users/types/user.types";
@@ -17,6 +17,7 @@ export type EditUserModalProps = {
 export function EditUserModal({ user, onClose, onUpdated }: EditUserModalProps) {
   const [state, setState] = useState(USER_INITIAL_STATE);
   const [pending, startTransition] = useTransition();
+  const toast = useToast();
 
   const fieldErrors = state.fieldErrors ?? {};
 
@@ -36,9 +37,13 @@ export function EditUserModal({ user, onClose, onUpdated }: EditUserModalProps) 
         setState(USER_INITIAL_STATE);
         onClose();
         onUpdated();
+        if (result.message) toast.success(result.message);
         return;
       }
 
+      // Erro de campo fica no formulário, ao lado do input a corrigir. O recado
+      // geral do servidor vai para o toast, que não depende do modal aberto.
+      if (result.message && !result.fieldErrors) toast.error(result.message);
       setState(result);
     });
   };
@@ -81,10 +86,6 @@ export function EditUserModal({ user, onClose, onUpdated }: EditUserModalProps) 
           noValidate
         >
           <input type="hidden" name="id" value={user.id} />
-
-          {state.status === "error" && state.message && (
-            <Alert tone="error">{state.message}</Alert>
-          )}
 
           <UserFormFields fieldErrors={fieldErrors} disabled={pending} user={user} />
         </form>

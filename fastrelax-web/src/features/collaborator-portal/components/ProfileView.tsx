@@ -2,6 +2,7 @@ import { Badge, Card, DetailList, Icon } from "@/components/ui";
 import type { DetailItem } from "@/components/ui";
 import { formatCpf, formatPhone } from "@/lib/format";
 import { formatTimeRange } from "@/features/collaborator-portal/lib/format";
+import { PushToggle } from "@/features/notifications/components/PushToggle";
 import type {
   AllowedWindow,
   CollaboratorProfile,
@@ -48,6 +49,10 @@ export function ProfileView({ profile, windows }: ProfileViewProps) {
 
         <DetailList items={items} />
       </Card>
+
+      {/* Fica no perfil porque a inscrição é deste navegador, não da conta: é
+          uma preferência do aparelho, ao lado dos dados de quem está logado. */}
+      <PushToggle />
 
       <Card padding="none" className="flex flex-col">
         <div className="flex flex-col gap-1 border-b border-line p-4">

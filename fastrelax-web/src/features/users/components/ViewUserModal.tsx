@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Alert, Badge, Button, CopyField, DetailList, Icon, Modal } from "@/components/ui";
+import { Alert, Badge, Button, CopyField, DetailList, Icon, Modal, useToast } from "@/components/ui";
 import type { DetailItem } from "@/components/ui";
 import {
   resetUserPasswordAction,
@@ -23,11 +23,12 @@ export type ViewUserModalProps = {
  * Detalhes do usuário e as operações que não cabem no formulário de edição:
  * situação e redefinição de senha vivem em endpoints próprios, ambos
  * exclusivos de ADMIN — a UI oferece e o backend decide (RH recebe 403 com
- * mensagem, exibida aqui mesmo).
+ * mensagem, entregue por toast).
  */
 export function ViewUserModal({ user, onClose, onEdit, onChanged }: ViewUserModalProps) {
   const [state, setState] = useState(USER_INITIAL_STATE);
   const [pending, startTransition] = useTransition();
+  const toast = useToast();
 
   const close = () => {
     setState(USER_INITIAL_STATE);
@@ -44,10 +45,11 @@ export function ViewUserModal({ user, onClose, onEdit, onChanged }: ViewUserModa
         setState(USER_INITIAL_STATE);
         onClose();
         onChanged();
+        toast.success(result.message);
         return;
       }
 
-      setState({ status: "error", message: result.message });
+      toast.error(result.message);
     });
   };
 
@@ -55,7 +57,16 @@ export function ViewUserModal({ user, onClose, onEdit, onChanged }: ViewUserModa
     if (!user) return;
 
     startTransition(async () => {
-      setState(await resetUserPasswordAction(user.id));
+      const result = await resetUserPasswordAction(user.id);
+
+      // No sucesso o estado guarda a senha temporária, que fica no modal para
+      // ser copiada. A recusa (403 do RH, por exemplo) sai pelo toast.
+      if (result.status === "error") {
+        if (result.message) toast.error(result.message);
+        return;
+      }
+
+      setState(result);
     });
   };
 
@@ -102,10 +113,6 @@ export function ViewUserModal({ user, onClose, onEdit, onChanged }: ViewUserModa
     >
       {user && (
         <div className="flex flex-col gap-6">
-          {state.status === "error" && state.message && (
-            <Alert tone="error">{state.message}</Alert>
-          )}
-
           <DetailList items={items} />
 
           {state.temporaryPassword ? (

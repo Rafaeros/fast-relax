@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, type FormEvent } from "react";
-import { Alert, Button, Card, Icon, Input, Modal, Stat, buttonStyles } from "@/components/ui";
+import { Alert, Button, Card, Icon, Input, Modal, Stat, buttonStyles, useToast } from "@/components/ui";
 import { importCollaboratorsAction } from "@/features/collaborators/actions/import.actions";
 import {
   IMPORT_ACCEPT,
@@ -20,6 +20,7 @@ export function ImportCollaboratorsModal({ onImported }: ImportCollaboratorsModa
   const [pending, startTransition] = useTransition();
   // Trocar a key remonta o input de arquivo para a próxima importação.
   const [formKey, setFormKey] = useState(0);
+  const toast = useToast();
 
   const result = state.result;
 
@@ -45,7 +46,13 @@ export function ImportCollaboratorsModal({ onImported }: ImportCollaboratorsModa
     const formData = new FormData(event.currentTarget);
 
     startTransition(async () => {
-      setState(await importCollaboratorsAction(state, formData));
+      const next = await importCollaboratorsAction(state, formData);
+
+      // Arquivo recusado por inteiro (formato, tamanho) é aviso do servidor e
+      // vai por toast. O resumo linha a linha continua no corpo do modal.
+      if (next.status === "error" && next.message) toast.error(next.message);
+
+      setState(next);
     });
   };
 
@@ -100,10 +107,6 @@ export function ImportCollaboratorsModal({ onImported }: ImportCollaboratorsModa
             onSubmit={handleSubmit}
             className="flex flex-col gap-5"
           >
-            {state.status === "error" && state.message && (
-              <Alert tone="error">{state.message}</Alert>
-            )}
-
             <Alert tone="info" title="Como funciona">
               Linhas com erro não interrompem o arquivo: são puladas e listadas ao final, para
               corrigir e reenviar só o que falhou.

@@ -16,7 +16,7 @@ const REFRESH_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 const BASE_COOKIE_OPTIONS = {
   httpOnly: true,
   sameSite: "lax",
-  secure: env.isProduction,
+  secure: env.secureCookies,
   path: "/",
 } as const;
 

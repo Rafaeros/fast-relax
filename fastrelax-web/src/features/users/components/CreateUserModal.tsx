@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, type FormEvent } from "react";
-import { Alert, Button, CopyField, Icon, Modal } from "@/components/ui";
+import { Alert, Button, CopyField, Icon, Modal, useToast } from "@/components/ui";
 import { createUserAction } from "@/features/users/actions/user.actions";
 import { UserFormFields } from "@/features/users/components/UserFormFields";
 import { USER_INITIAL_STATE } from "@/features/users/types/user.types";
@@ -17,6 +17,7 @@ export function CreateUserModal({ onCreated }: CreateUserModalProps) {
   const [pending, startTransition] = useTransition();
   // Trocar a key remonta o formulário e zera os campos para o próximo cadastro.
   const [formKey, setFormKey] = useState(0);
+  const toast = useToast();
 
   const fieldErrors = state.fieldErrors ?? {};
   // O modal não fecha sozinho no sucesso: a senha temporária aparece uma única
@@ -45,7 +46,15 @@ export function CreateUserModal({ onCreated }: CreateUserModalProps) {
     const formData = new FormData(event.currentTarget);
 
     startTransition(async () => {
-      setState(await createUserAction(state, formData));
+      const result = await createUserAction(state, formData);
+
+      // Aqui o modal permanece aberto no sucesso (a senha temporária precisa ser
+      // copiada), então só o erro geral vira toast.
+      if (result.status === "error" && result.message && !result.fieldErrors) {
+        toast.error(result.message);
+      }
+
+      setState(result);
     });
   };
 
@@ -110,10 +119,6 @@ export function CreateUserModal({ onCreated }: CreateUserModalProps) {
             className="flex flex-col gap-5"
             noValidate
           >
-            {state.status === "error" && state.message && (
-              <Alert tone="error">{state.message}</Alert>
-            )}
-
             <UserFormFields fieldErrors={fieldErrors} disabled={pending} />
           </form>
         )}

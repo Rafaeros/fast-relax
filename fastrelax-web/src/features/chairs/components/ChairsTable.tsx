@@ -11,6 +11,7 @@ import {
   TableIdentity,
   TableToolbar,
   ViewAction,
+  useToast,
 } from "@/components/ui";
 import type { DataTableColumn } from "@/components/ui";
 import type { PageSlice } from "@/lib/api/pagination.types";
@@ -49,6 +50,7 @@ export function ChairsTable({ initialSlice, loadPage, isAdmin = false }: ChairsT
   // e montar um diálogo por registro encheria o DOM à toa.
   const [viewing, setViewing] = useState<Chair | null>(null);
   const [editing, setEditing] = useState<Chair | null>(null);
+  const toast = useToast();
 
   const reload = () => setReloadSignal((current) => current + 1);
 
@@ -129,23 +131,35 @@ export function ChairsTable({ initialSlice, loadPage, isAdmin = false }: ChairsT
               label={row.active ? "Desativar" : "Ativar"}
               icon={row.active ? "eyeOff" : "check"}
               onClick={async () => {
-                await toggleChairActiveAction(row.id);
-                reload();
+                const result = await toggleChairActiveAction(row.id);
+                // Recusa do backend (403, cadeira em uso) só ia para o log; sem
+                // o toast a linha voltava igual, sem explicação.
+                if (result.ok) {
+                  reload();
+                  toast.success(result.message);
+                } else {
+                  toast.error(result.message);
+                }
               }}
             />
             <DeleteAction
               itemName={row.name}
               description="A cadeira sai do rodízio de atendimento. As sessões já registradas continuam no histórico."
               onConfirm={async () => {
-                await deleteChairAction(row.id);
-                reload();
+                const result = await deleteChairAction(row.id);
+                if (result.ok) {
+                  reload();
+                  toast.success(result.message);
+                } else {
+                  toast.error(result.message);
+                }
               }}
             />
           </RowActions>
         ),
       },
     ],
-    [],
+    [toast],
   );
 
   return (

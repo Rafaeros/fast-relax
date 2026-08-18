@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, type FormEvent } from "react";
-import { Alert, Button, Icon, Modal } from "@/components/ui";
+import { Button, Icon, Modal, useToast } from "@/components/ui";
 import { updateDepartmentAction } from "@/features/departments/actions/department.actions";
 import { DepartmentFormFields } from "@/features/departments/components/DepartmentFormFields";
 import {
@@ -24,6 +24,7 @@ export function EditDepartmentModal({
 }: EditDepartmentModalProps) {
   const [state, setState] = useState(DEPARTMENT_INITIAL_STATE);
   const [pending, startTransition] = useTransition();
+  const toast = useToast();
 
   const fieldErrors = state.fieldErrors ?? {};
 
@@ -43,9 +44,13 @@ export function EditDepartmentModal({
         setState(DEPARTMENT_INITIAL_STATE);
         onClose();
         onUpdated();
+        if (result.message) toast.success(result.message);
         return;
       }
 
+      // Erro de campo fica no formulário, ao lado do input a corrigir. O recado
+      // geral do servidor vai para o toast, que não depende do modal aberto.
+      if (result.message && !result.fieldErrors) toast.error(result.message);
       setState(result);
     });
   };
@@ -88,10 +93,6 @@ export function EditDepartmentModal({
           noValidate
         >
           <input type="hidden" name="id" value={department.id} />
-
-          {state.status === "error" && state.message && (
-            <Alert tone="error">{state.message}</Alert>
-          )}
 
           <DepartmentFormFields
             fieldErrors={fieldErrors}

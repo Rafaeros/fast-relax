@@ -4,7 +4,9 @@ import java.time.LocalDateTime;
 
 import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 
 import br.rafaeros.fastrelax_api.features.collaborators.Collaborator;
 import jakarta.persistence.Column;
@@ -40,8 +42,22 @@ public class DeviceToken {
     @JoinColumn(name = "collaborator_id", nullable = false)
     private Collaborator collaborator;
 
-    @Column(nullable = false, unique = true, columnDefinition = "TEXT")
+    /** Token do FCM. Preenchido em ANDROID e IOS; nulo em WEB. */
+    @Column(columnDefinition = "TEXT")
     private String token;
+
+    /**
+     * Inscrição do navegador. Preenchida em WEB; nula nas demais plataformas.
+     *
+     * <p>
+     * Web Push não entrega por token: o navegador devolve o endereço do serviço
+     * de push dele mais as chaves que cifram a mensagem. São dados demais para
+     * uma coluna de texto, e o JSONB mantém o formato igual ao que o navegador
+     * produz.
+     */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "push_subscription", columnDefinition = "jsonb")
+    private PushSubscription pushSubscription;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)

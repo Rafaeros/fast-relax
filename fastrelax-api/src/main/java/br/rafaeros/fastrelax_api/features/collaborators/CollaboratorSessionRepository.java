@@ -1,6 +1,7 @@
 package br.rafaeros.fastrelax_api.features.collaborators;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
@@ -51,4 +52,27 @@ public interface CollaboratorSessionRepository
     /** Candidatas a expiração: sessões ainda ativas de hoje ou de dias anteriores. */
     List<CollaboratorSession> findByStatusInAndSessionDateLessThanEqual(List<SessionStatus> statuses,
             LocalDate sessionDate);
+
+    /**
+     * Sessões agendadas que começam dentro da janela pedida.
+     *
+     * <p>
+     * Nativa porque a comparação é com o instante do início — data mais hora —, e
+     * JPQL não soma os dois. No Postgres {@code date + time} já é um timestamp.
+     *
+     * <p>
+     * O piso em {@code now} exclui o que já passou: sessão vencida não recebe
+     * lembrete, recebe o aviso de expiração.
+     */
+    @Query(value = """
+            SELECT * FROM collaborator_sessions s
+            WHERE s.status = 'SCHEDULED'
+              AND (s.session_date + s.start_time) > :now
+              AND (s.session_date + s.start_time) <= :limit
+            """, nativeQuery = true)
+    List<CollaboratorSession> findScheduledStartingBetween(@Param("now") LocalDateTime now,
+            @Param("limit") LocalDateTime limit);
+
+    /** Agenda de um dia inteiro, base do resumo enviado na véspera. */
+    List<CollaboratorSession> findBySessionDateAndStatus(LocalDate sessionDate, SessionStatus status);
 }

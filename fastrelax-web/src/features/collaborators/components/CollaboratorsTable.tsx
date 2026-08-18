@@ -10,6 +10,7 @@ import {
   TableIdentity,
   TableToolbar,
   ViewAction,
+  useToast,
 } from "@/components/ui";
 import type { DataTableColumn } from "@/components/ui";
 import type { PageSlice } from "@/lib/api/pagination.types";
@@ -50,6 +51,7 @@ export function CollaboratorsTable({
   // e montar um diálogo por registro encheria o DOM à toa.
   const [viewing, setViewing] = useState<Collaborator | null>(null);
   const [editing, setEditing] = useState<Collaborator | null>(null);
+  const toast = useToast();
 
   const reload = () => setReloadSignal((current) => current + 1);
 
@@ -125,15 +127,22 @@ export function CollaboratorsTable({
               itemName={row.name}
               description="O colaborador deixa de agendar sessões e sai das listagens."
               onConfirm={async () => {
-                await deleteCollaboratorAction(row.id);
-                reload();
+                const result = await deleteCollaboratorAction(row.id);
+                // A recusa do backend (sessões em aberto, por exemplo) passava
+                // despercebida: a lista só voltava intacta.
+                if (result.ok) {
+                  reload();
+                  toast.success(result.message);
+                } else {
+                  toast.error(result.message);
+                }
               }}
             />
           </RowActions>
         ),
       },
     ],
-    [],
+    [toast],
   );
 
   return (

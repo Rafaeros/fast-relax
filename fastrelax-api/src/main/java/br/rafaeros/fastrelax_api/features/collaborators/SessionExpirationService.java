@@ -30,6 +30,7 @@ public class SessionExpirationService {
     private final CollaboratorSessionRepository sessionRepository;
     private final SessionSettingsService sessionSettingsService;
     private final br.rafaeros.fastrelax_api.features.chairs.ChairCommandService chairCommandService;
+    private final org.springframework.context.ApplicationEventPublisher events;
 
     /**
      * Fecha as sessões ativas que chegaram ao fim, com desfechos diferentes:
@@ -78,6 +79,18 @@ public class SessionExpirationService {
         }
 
         sessionRepository.saveAll(closed);
+
+        // Publicado só depois do saveAll: o listener roda após o commit, e
+        // anunciar antes deixaria o aviso descrever um estado que ainda podia
+        // ser desfeito por um erro de gravação.
+        for (CollaboratorSession session : closed) {
+            events.publishEvent(SessionLifecycleEvent.of(
+                    session.getStatus() == SessionStatus.EXPIRED
+                            ? SessionLifecycleEvent.Type.EXPIRED
+                            : SessionLifecycleEvent.Type.FINISHED,
+                    session));
+        }
+
         return closed.size();
     }
 

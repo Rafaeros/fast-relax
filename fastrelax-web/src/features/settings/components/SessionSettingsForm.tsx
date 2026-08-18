@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, type FormEvent } from "react";
-import { Alert, Button, Card, CardTitle, Icon, Input } from "@/components/ui";
+import { Button, Card, CardTitle, Icon, Input, useToast } from "@/components/ui";
 import type { IconName } from "@/components/ui";
 import { formatLongDate } from "@/lib/format";
 import { updateSessionSettingsAction } from "@/features/settings/actions/session-settings.actions";
@@ -58,6 +58,7 @@ const FIELDS: {
 export function SessionSettingsForm({ settings, onSaved }: SessionSettingsFormProps) {
   const [state, setState] = useState(SESSION_SETTINGS_INITIAL_STATE);
   const [pending, startTransition] = useTransition();
+  const toast = useToast();
 
   const fieldErrors = state.fieldErrors ?? {};
 
@@ -69,9 +70,15 @@ export function SessionSettingsForm({ settings, onSaved }: SessionSettingsFormPr
       const result = await updateSessionSettingsAction(state, formData);
       setState(result);
 
-      if (result.status === "success" && result.settings) {
-        onSaved(result.settings);
+      if (result.status === "success") {
+        if (result.settings) onSaved(result.settings);
+        if (result.message) toast.success(result.message);
+        return;
       }
+
+      // Limite fora da faixa aparece no próprio campo; o resto vem do servidor
+      // e vai por toast.
+      if (result.message && !result.fieldErrors) toast.error(result.message);
     });
   };
 
@@ -79,14 +86,6 @@ export function SessionSettingsForm({ settings, onSaved }: SessionSettingsFormPr
     <Card padding="lg" className="max-w-2xl">
       <form onSubmit={handleSubmit} className="flex flex-col gap-6" noValidate>
         <CardTitle>Parâmetros da agenda</CardTitle>
-
-        {state.status === "error" && state.message && (
-          <Alert tone="error">{state.message}</Alert>
-        )}
-
-        {state.status === "success" && state.message && (
-          <Alert tone="success">{state.message}</Alert>
-        )}
 
         <div className="flex flex-col gap-5">
           {FIELDS.map((field) => {

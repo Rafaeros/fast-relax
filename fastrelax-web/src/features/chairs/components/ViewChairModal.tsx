@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { Alert, Badge, Button, DetailList, Icon, Modal } from "@/components/ui";
+import { useTransition } from "react";
+import { Badge, Button, DetailList, Icon, Modal, useToast } from "@/components/ui";
 import type { DetailItem } from "@/components/ui";
 import { formatLongDate } from "@/lib/format";
 import { testChairRelayAction } from "@/features/chairs/actions/chair.actions";
@@ -21,24 +21,24 @@ export type ViewChairModalProps = {
 };
 
 export function ViewChairModal({ chair, onClose, onEdit, isAdmin = false }: ViewChairModalProps) {
-  // O id viaja junto com o resultado: trocar de cadeira sem fechar o modal
-  // descarta o feedback anterior por comparação, sem precisar de efeito para
-  // limpar o estado.
-  const [feedback, setFeedback] = useState<
-    { chairId: number; ok: boolean; message: string } | null
-  >(null);
   const [pending, startTransition] = useTransition();
-
-  const currentFeedback = feedback && feedback.chairId === chair?.id ? feedback : null;
+  const { success, error } = useToast();
 
   const runRelayTest = () => {
     if (!chair) return;
     const chairId = chair.id;
+    const chairName = chair.name;
 
-    setFeedback(null);
     startTransition(async () => {
+      // O toast vive fora do modal, então cita a cadeira pelo nome: o resultado
+      // pode chegar depois de o técnico fechar o modal ou trocar de linha.
       const result = await testChairRelayAction(chairId, RELAY_TEST_SECONDS);
-      setFeedback({ chairId, ...result });
+      const message = `${chairName}: ${result.message}`;
+      if (result.ok) {
+        success(message);
+      } else {
+        error(message);
+      }
     });
   };
 
@@ -101,12 +101,6 @@ export function ViewChairModal({ chair, onClose, onEdit, isAdmin = false }: View
                   conferir a fiação depois de instalar a cadeira.
                 </p>
               </div>
-
-              {currentFeedback && (
-                <Alert tone={currentFeedback.ok ? "success" : "error"}>
-                  {currentFeedback.message}
-                </Alert>
-              )}
 
               <Button
                 variant="secondary"

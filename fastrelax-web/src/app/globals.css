@@ -275,3 +275,16 @@ body {
   background-color: var(--surface-base);
   color: var(--text-primary);
 }
+
+/* Entrada do toast: sobe alguns pixels enquanto aparece, para o olho perceber
+   que algo novo chegou sem um salto brusco. */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

@@ -44,6 +44,9 @@ export type { InputProps, TextareaProps, SelectProps } from "@/components/ui/Inp
 export { Alert } from "@/components/ui/Alert";
 export type { AlertProps, AlertTone } from "@/components/ui/Alert";
 
+export { ToastProvider, useToast } from "@/components/ui/Toast";
+export type { ToastTone, ToastOptions } from "@/components/ui/Toast";
+
 export { IconButton, iconButtonStyles } from "@/components/ui/IconButton";
 export type { IconButtonProps, IconButtonTone, IconButtonSize } from "@/components/ui/IconButton";
 
