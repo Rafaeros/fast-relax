@@ -55,7 +55,11 @@ export function CollaboratorFormFields({
           // Na edição o campo já vem com o CPF vinculado. Reenviar o mesmo valor
           // não conta como troca: o backend compara o blind index e ignora.
           defaultValue={collaborator?.cpf}
-          hint={editing ? "Alterar troca a credencial de login do colaborador." : undefined}
+          hint={
+            editing
+              ? "Alterar muda o CPF que ele informa no login; a senha continua a mesma."
+              : "Único dentro da empresa — o mesmo CPF pode existir em outro cliente."
+          }
           error={fieldErrors.cpf}
           leadingIcon={<Icon name="shield" />}
         />
@@ -72,6 +76,30 @@ export function CollaboratorFormFields({
           leadingIcon={<Icon name="phone" />}
         />
       </div>
+
+      {/*
+        Opcional de propósito: parte do quadro não tem e-mail corporativo, e
+        exigir um travaria o cadastro de quem trabalha no chão de fábrica.
+        Preenchido, a pessoa recebe convite e define a própria senha — nada
+        secreto passa por WhatsApp nem fica anotado na mesa do RH.
+      */}
+      <Input
+        name="email"
+        type="email"
+        label="E-mail (opcional)"
+        placeholder="colaborador@empresa.com"
+        autoComplete="off"
+        maxLength={180}
+        disabled={disabled}
+        defaultValue={collaborator?.email ?? ""}
+        hint={
+          editing
+            ? "Em branco remove o e-mail — e com ele a recuperação de senha."
+            : "Com e-mail, ele recebe um convite para definir a própria senha."
+        }
+        error={fieldErrors.email}
+        leadingIcon={<Icon name="mail" />}
+      />
 
       <div className={showActive ? "grid gap-5 sm:grid-cols-2" : undefined}>
         <Select

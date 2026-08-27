@@ -10,6 +10,7 @@ import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import br.rafaeros.fastrelax_api.core.tenancy.TenantSpecifications;
 import br.rafaeros.fastrelax_api.core.crypto.CryptoService;
 import br.rafaeros.fastrelax_api.features.collaborators.Collaborator;
 import br.rafaeros.fastrelax_api.features.collaborators.CollaboratorRepository;
@@ -45,7 +46,9 @@ public class CollaboratorExportService {
      */
     @Transactional(readOnly = true)
     public byte[] export(boolean onlyActive) {
-        List<Collaborator> collaborators = collaboratorRepository.findAll().stream()
+        // Escopado: a planilha carrega CPF de todo mundo, e sem o filtro de empresa
+        // um cliente exportaria o quadro de pessoal dos outros.
+        List<Collaborator> collaborators = collaboratorRepository.findAllScoped(null).stream()
                 .filter(collaborator -> !onlyActive || collaborator.isActive())
                 .sorted(Comparator.comparing((Collaborator collaborator) -> collaborator.getName(),
                         String.CASE_INSENSITIVE_ORDER))
@@ -53,7 +56,8 @@ public class CollaboratorExportService {
 
         // Uma consulta para todos os horários, em vez de uma por colaborador.
         Map<Long, List<CollaboratorWorkSchedule>> schedulesByCollaborator = new HashMap<>();
-        for (CollaboratorWorkSchedule schedule : scheduleRepository.findAll()) {
+        for (CollaboratorWorkSchedule schedule : scheduleRepository.findAll(
+                TenantSpecifications.<CollaboratorWorkSchedule>currentCompany("collaborator", "company"))) {
             if (schedule.getCollaborator() != null) {
                 schedulesByCollaborator
                         .computeIfAbsent(schedule.getCollaborator().getId(), key -> new ArrayList<>())
@@ -72,7 +76,8 @@ public class CollaboratorExportService {
                     collaborator.getPhoneNumber(),
                     collaborator.getDepartment() != null ? collaborator.getDepartment().getName() : "",
                     reference != null ? reference.getAllowedStartTime().format(TIME_FORMAT) : "",
-                    reference != null ? reference.getAllowedEndTime().format(TIME_FORMAT) : ""
+                    reference != null ? reference.getAllowedEndTime().format(TIME_FORMAT) : "",
+                    collaborator.getEmail() != null ? collaborator.getEmail() : ""
             });
         }
 

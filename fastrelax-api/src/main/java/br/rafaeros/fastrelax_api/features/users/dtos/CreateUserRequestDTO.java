@@ -7,12 +7,18 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 /**
- * Cadastro feito por ADMIN.
+ * Cadastro de usuário do painel.
  *
  * <p>
  * Sem campo de senha de propósito: quem cadastra não escolhe a senha de outra
  * pessoa. O sistema gera uma temporária e a devolve uma única vez na resposta,
- * para o ADMIN repassar ao usuário — que é obrigado a trocá-la no primeiro acesso.
+ * para ser repassada ao usuário — que é obrigado a trocá-la no primeiro acesso.
+ *
+ * @param companyId a que empresa o usuário pertence. Só o SYSADMIN informa, ao
+ *                  cadastrar o gestor de um cliente; para quem já opera dentro
+ *                  de uma empresa o campo é ignorado, e a empresa vem do
+ *                  contexto — aceitar o valor do corpo permitiria criar usuário
+ *                  na empresa de outro cliente
  */
 public record CreateUserRequestDTO(
     @NotBlank(message = "O nome é obrigatório")
@@ -25,5 +31,7 @@ public record CreateUserRequestDTO(
     String email,
 
     @NotNull(message = "O perfil é obrigatório")
-    UserRole role
+    UserRole role,
+
+    Long companyId
 ){}

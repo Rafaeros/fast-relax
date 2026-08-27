@@ -1,5 +1,6 @@
 import type { PageParams } from "@/lib/api/pagination.types";
 import type { CollaboratorFieldErrors } from "@/features/collaborators/schemas/collaborator.schema";
+import type { CredentialDelivery } from "@/features/authentication/types/auth.types";
 
 /** Espelha `CollaboratorResponseDTO` do fastrelax-api. */
 export type Collaborator = {
@@ -10,9 +11,24 @@ export type Collaborator = {
   /** Vem decriptado pela API, sem máscara (11 dígitos). */
   cpf: string;
   phoneNumber: string;
+  /** Nulo quando não foi informado; sem ele não há recuperação de senha. */
+  email: string | null;
+  /** Verdadeiro enquanto o colaborador ainda não definiu a própria senha. */
+  mustChangePassword: boolean;
   active: boolean;
   createdAt: string;
   deletedAt: string | null;
+};
+
+/**
+ * Espelha `CreatedCollaboratorResponseDTO`.
+ *
+ * A senha temporária aparece só nesta resposta: o banco guarda apenas o hash,
+ * então perder o valor significa ter de redefinir.
+ */
+export type CreatedCollaborator = {
+  collaborator: Collaborator;
+  credential: CredentialDelivery;
 };
 
 /** Espelha `CollaboratorFilterDTO` — todos os campos são opcionais. */
@@ -31,6 +47,11 @@ export type CreateCollaboratorInput = {
   name: string;
   cpf: string;
   phoneNumber: string;
+  /**
+   * Opcional. Preenchido, a pessoa recebe convite e define a própria senha; em
+   * branco, o sistema gera uma temporária para o RH repassar.
+   */
+  email?: string;
   departmentId?: number;
 };
 
@@ -44,6 +65,8 @@ export type UpdateCollaboratorInput = {
   departmentId: number;
   name: string;
   phoneNumber: string;
+  /** Em branco remove o e-mail — e com ele a recuperação de senha. */
+  email?: string;
   active: boolean;
   cpf?: string;
 };
@@ -57,6 +80,11 @@ export type CreateCollaboratorState = {
   status: "idle" | "success" | "error";
   message?: string;
   fieldErrors?: CollaboratorFieldErrors;
+  /**
+   * Como o acesso foi entregue: convite por e-mail ou senha temporária. Quando é
+   * senha, ela aparece uma única vez — o banco guarda apenas o hash.
+   */
+  credential?: CredentialDelivery;
 };
 
 export const CREATE_COLLABORATOR_INITIAL_STATE: CreateCollaboratorState = { status: "idle" };

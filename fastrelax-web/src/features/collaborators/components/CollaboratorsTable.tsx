@@ -22,6 +22,7 @@ import { CreateCollaboratorModal } from "@/features/collaborators/components/Cre
 import { ExportCollaboratorsButton } from "@/features/collaborators/components/ExportCollaboratorsButton";
 import { ImportCollaboratorsModal } from "@/features/collaborators/components/ImportCollaboratorsModal";
 import { EditCollaboratorModal } from "@/features/collaborators/components/EditCollaboratorModal";
+import { ResetPasswordAction } from "@/features/collaborators/components/ResetPasswordAction";
 import { ViewCollaboratorModal } from "@/features/collaborators/components/ViewCollaboratorModal";
 import type {
   Collaborator,
@@ -123,6 +124,7 @@ export function CollaboratorsTable({
           <RowActions>
             <ViewAction onClick={() => setViewing(row)} />
             <EditAction onClick={() => setEditing(row)} />
+            <ResetPasswordAction collaborator={row} />
             <DeleteAction
               itemName={row.name}
               description="O colaborador deixa de agendar sessões e sai das listagens."

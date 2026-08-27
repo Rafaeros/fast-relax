@@ -6,6 +6,7 @@ import {
   createCollaborator,
   deleteCollaborator,
   listCollaborators,
+  resetCollaboratorPassword,
   toggleCollaboratorActive,
   updateCollaborator,
 } from "@/features/collaborators/services/collaborator.service";
@@ -56,6 +57,7 @@ export async function createCollaboratorAction(
     name: String(formData.get("name") ?? ""),
     cpf: String(formData.get("cpf") ?? ""),
     phoneNumber: String(formData.get("phoneNumber") ?? ""),
+    email: String(formData.get("email") ?? ""),
     departmentId: String(formData.get("departmentId") ?? ""),
   });
 
@@ -86,20 +88,27 @@ export async function createCollaboratorAction(
   const windows = parseAllowedWindows(String(formData.get("allowedWindows") ?? ""));
 
   if (windows.length > 0) {
-    const scheduleResult = await replaceWeeklySchedule(result.data.id, windows);
+    const scheduleResult = await replaceWeeklySchedule(result.data.collaborator.id, windows);
 
     if (!scheduleResult.ok) {
       revalidatePath("/painel/colaboradores");
       return {
         status: "error",
-        message: `Colaborador cadastrado, mas o horário permitido não foi salvo: ${scheduleResult.message}`,
+        message: `Colaborador cadastrado, mas o horário permitido não foi salvo: `,
         fieldErrors: { allowedWindows: scheduleResult.message },
+        // A senha sai mesmo com a semana falhando: ela não aparece de novo, e
+        // o horário pode ser corrigido depois pela edição.
+        credential: result.data.credential,
       };
     }
   }
 
   revalidatePath("/painel/colaboradores");
-  return { status: "success", message: result.message };
+  return {
+    status: "success",
+    message: result.message,
+    credential: result.data.credential,
+  };
 }
 
 /**
@@ -121,6 +130,7 @@ export async function updateCollaboratorAction(
     name: String(formData.get("name") ?? ""),
     cpf: String(formData.get("cpf") ?? ""),
     phoneNumber: String(formData.get("phoneNumber") ?? ""),
+    email: String(formData.get("email") ?? ""),
     departmentId: String(formData.get("departmentId") ?? ""),
     active: String(formData.get("active") ?? "true"),
   });
@@ -178,4 +188,29 @@ export async function deleteCollaboratorAction(id: number): Promise<MutationResu
   if (result.ok) revalidatePath("/painel/colaboradores");
 
   return { ok: result.ok, message: result.message };
+}
+
+/**
+ * Redefine a senha de um colaborador e devolve a temporária.
+ *
+ * <p>
+ * É a saída para quem não tem e-mail cadastrado: sem endereço não há link de
+ * recuperação, e esquecer a senha viraria um caminho sem saída. Quem tem e-mail
+ * também pode usar o "esqueci minha senha" sozinho.
+ */
+export async function resetCollaboratorPasswordAction(
+  id: number,
+): Promise<MutationResult & { temporaryPassword?: string }> {
+  const result = await resetCollaboratorPassword(id);
+
+  if (!result.ok) {
+    return { ok: false, message: result.message };
+  }
+
+  revalidatePath("/painel/colaboradores");
+  return {
+    ok: true,
+    message: result.message,
+    temporaryPassword: result.data.temporaryPassword,
+  };
 }

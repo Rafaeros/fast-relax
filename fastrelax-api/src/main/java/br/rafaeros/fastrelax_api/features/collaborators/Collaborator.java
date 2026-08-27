@@ -1,77 +1,106 @@
 package br.rafaeros.fastrelax_api.features.collaborators;
 
-import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 
-import org.hibernate.annotations.ColumnDefault;
-import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.SQLRestriction;
-import org.hibernate.annotations.UpdateTimestamp;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import br.rafaeros.fastrelax_api.core.security.CredentialHolder;
+import br.rafaeros.fastrelax_api.core.tenancy.SoftDeletableCompanyEntity;
+import br.rafaeros.fastrelax_api.core.tenancy.TenantPrincipal;
+import br.rafaeros.fastrelax_api.features.auth.RefreshToken;
 import br.rafaeros.fastrelax_api.features.departments.Department;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+/**
+ * Pessoa atendida pelas cadeiras, dentro de uma empresa.
+ *
+ * <p>
+ * O CPF é guardado de duas formas com propósitos distintos:
+ * <ul>
+ * <li>{@code cpfEncrypted} — AES-GCM reversível, para o RH consultar. IV
+ * aleatório, então o mesmo CPF gera ciphertext diferente a cada gravação: não
+ * serve para busca nem para unicidade.</li>
+ * <li>{@code cpfHash} — HMAC determinístico (blind index). Carrega a constraint
+ * de unicidade e é por onde o login procura.</li>
+ * </ul>
+ *
+ * <p>
+ * O CPF identifica; quem autentica é a senha. Antes o blind index fazia os dois
+ * papéis — encontrar a pessoa <em>era</em> provar quem ela é —, e isso deixava
+ * o acesso valendo o que vale um CPF, que circula em qualquer cadastro. A
+ * unicidade do CPF é por empresa, não global: a mesma pessoa pode ser
+ * colaboradora de dois clientes.
+ */
 @Entity
 @Table(name = "collaborators")
 @SQLRestriction("deleted_at IS NULL")
-@AllArgsConstructor
 @NoArgsConstructor
 @Getter
 @Setter
-public class Collaborator implements UserDetails {
+public class Collaborator extends SoftDeletableCompanyEntity
+        implements UserDetails, TenantPrincipal, CredentialHolder {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @ManyToOne(fetch = FetchType.EAGER)
+    @ManyToOne(fetch = FetchType.EAGER, optional = false)
     @JoinColumn(name = "department_id", nullable = false)
     private Department department;
 
     @Column(nullable = false, length = 120)
     private String name;
 
-    /** AES-GCM ciphertext. Random IV, so it is never equal for equal CPFs — do not query by it. */
+    /** Ciphertext AES-GCM. IV aleatório, então nunca é igual para CPFs iguais — não consulte por ele. */
     @Column(name = "cpf_encrypted", nullable = false, columnDefinition = "TEXT")
     private String cpfEncrypted;
 
-    /** Deterministic HMAC of the normalized CPF. Carries the unique constraint and every lookup. */
-    @Column(name = "cpf_hash", unique = true, nullable = false, columnDefinition = "TEXT")
+    /** HMAC determinístico do CPF normalizado. Carrega a unicidade e toda busca. */
+    @Column(name = "cpf_hash", nullable = false, columnDefinition = "TEXT")
     private String cpfHash;
 
     @Column(name = "phone_number", nullable = false, length = 20)
     private String phoneNumber;
 
-    @Column(nullable = false)
-    @ColumnDefault("true")
-    private boolean active = true;
+    /**
+     * Opcional: parte do quadro não tem e-mail corporativo, e exigir um travaria
+     * o cadastro de quem trabalha no chão de fábrica.
+     *
+     * <p>
+     * Quem tem recebe convite de primeiro acesso e recupera a senha sozinho; quem
+     * não tem depende do RH gerar uma temporária. Único dentro da empresa, como o
+     * CPF — a mesma pessoa pode ser colaboradora de dois clientes.
+     */
+    @Column(length = 180)
+    private String email;
 
-    @CreationTimestamp
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    @Column(name = "password_hash", nullable = false)
+    private String passwordHash;
 
-    @UpdateTimestamp
-    @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
+    /**
+     * Verdadeiro enquanto vale a senha temporária entregue pelo RH. Até a troca,
+     * o acesso fica restrito à própria definição de senha.
+     */
+    @Column(name = "must_change_password", nullable = false)
+    private boolean mustChangePassword = true;
 
-    @Column(name = "deleted_at")
-    private LocalDateTime deletedAt;
+    @Override
+    public Long tenantCompanyId() {
+        return companyId();
+    }
+
+    @Override
+    public RefreshToken.SubjectType subjectType() {
+        return RefreshToken.SubjectType.COLLABORATOR;
+    }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
@@ -80,10 +109,13 @@ public class Collaborator implements UserDetails {
 
     @Override
     public String getPassword() {
-        // Collaborators authenticate with the CPF itself; there is no separate password.
-        return this.cpfHash;
+        return this.passwordHash;
     }
 
+    /**
+     * O blind index do CPF. Não é o que autentica — é o identificador dentro da
+     * empresa, e é o que o Spring Security usa como nome do principal.
+     */
     @Override
     public String getUsername() {
         return this.cpfHash;
@@ -104,8 +136,15 @@ public class Collaborator implements UserDetails {
         return true;
     }
 
+    /**
+     * Empresa suspensa desliga todos os colaboradores dela de uma vez, sem
+     * precisar percorrer registro a registro.
+     */
     @Override
     public boolean isEnabled() {
-        return this.active && this.deletedAt == null;
+        return isActive()
+                && !isDeleted()
+                && getCompany() != null
+                && getCompany().isEnabled();
     }
 }

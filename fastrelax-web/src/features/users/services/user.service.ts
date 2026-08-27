@@ -82,3 +82,33 @@ export async function deleteUser(id: number): Promise<ApiResult<null>> {
     token: await readAccessToken(),
   });
 }
+
+/**
+ * Primeiro acesso: troca a senha temporária definida por quem cadastrou.
+ *
+ * <p>
+ * É uma das poucas rotas liberadas enquanto `mustChangePassword` bloqueia o
+ * resto da API — sem ela não haveria como sair da senha temporária.
+ */
+export async function defineFirstAccessPassword(
+  newPassword: string,
+  confirmNewPassword: string,
+): Promise<ApiResult<null>> {
+  return apiFetch<null>("/users/me/first-access-password", {
+    method: "POST",
+    body: { newPassword, confirmNewPassword },
+    token: await readAccessToken(),
+  });
+}
+
+export async function changeMyPassword(
+  currentPassword: string,
+  newPassword: string,
+  confirmNewPassword: string,
+): Promise<ApiResult<null>> {
+  return apiFetch<null>("/users/me/password", {
+    method: "PATCH",
+    body: { currentPassword, newPassword, confirmNewPassword },
+    token: await readAccessToken(),
+  });
+}

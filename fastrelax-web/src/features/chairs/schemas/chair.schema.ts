@@ -20,6 +20,8 @@ export function validateChairInput(input: {
   macAddress: string;
   ipAddress?: string;
   port?: string;
+  firmwareId?: string;
+  wifiBssid?: string;
 }): ChairValidation {
   const name = input.name.trim();
   // O backend grava sempre em maiúsculas com dois-pontos; normalizar aqui evita
@@ -54,6 +56,16 @@ export function validateChairInput(input: {
     return { valid: false, fieldErrors };
   }
 
+  // Campo em branco significa "sem versão registrada", não zero.
+  const firmwareId = Number(input.firmwareId);
+
+  // Normalizado como o MAC, e pelo mesmo motivo: o backend grava em maiúsculas
+  // com dois-pontos, e sem isso o mesmo AP pareceria dois valores diferentes.
+  const wifiBssid = (input.wifiBssid ?? "").trim().toUpperCase().replace(/-/g, ":");
+  if (wifiBssid && !MAC_PATTERN.test(wifiBssid)) {
+    fieldErrors.wifiBssid = "Informe no formato AA:BB:CC:DD:EE:FF.";
+  }
+
   return {
     valid: true,
     data: {
@@ -61,6 +73,9 @@ export function validateChairInput(input: {
       macAddress,
       ipAddress: ipAddress || undefined,
       port,
+      firmwareId: Number.isInteger(firmwareId) && firmwareId > 0 ? firmwareId : undefined,
+      // String vazia viaja de propósito: é assim que se apaga a fixação de AP.
+      wifiBssid,
     },
   };
 }
@@ -68,7 +83,7 @@ export function validateChairInput(input: {
 /** Converte os erros do backend (`"campo: mensagem"`) em erro por campo. */
 export function mapChairApiErrors(errors: string[]): ChairFieldErrors {
   const fieldErrors: ChairFieldErrors = {};
-  const known = new Set(["name", "macAddress", "ipAddress", "port"]);
+  const known = new Set(["name", "macAddress", "ipAddress", "port", "firmwareId", "wifiBssid"]);
 
   for (const entry of errors) {
     const [field, ...rest] = entry.split(":");

@@ -1,17 +1,25 @@
 "use client";
 
 import { useState, useTransition, type FormEvent } from "react";
-import { Alert, Button, CopyField, Icon, Modal, useToast } from "@/components/ui";
+import { Button, Icon, Modal, useToast } from "@/components/ui";
+import { CredentialDeliveryPanel } from "@/features/authentication/components/CredentialDeliveryPanel";
 import { createUserAction } from "@/features/users/actions/user.actions";
 import { UserFormFields } from "@/features/users/components/UserFormFields";
 import { USER_INITIAL_STATE } from "@/features/users/types/user.types";
+import type { CompanyOption } from "@/features/users/types/user.types";
+import type { UserRole } from "@/features/authentication/types/auth.types";
+import { hasFieldErrors } from "@/lib/forms";
 
 export type CreateUserModalProps = {
   /** Disparado após o cadastro dar certo — a tabela recarrega a partir daqui. */
   onCreated: () => void;
+  /** Papel de quem está cadastrando: define os perfis oferecidos. */
+  currentRole: UserRole;
+  /** Empresas para o SYSADMIN escolher; vazio para os demais papéis. */
+  companies?: CompanyOption[];
 };
 
-export function CreateUserModal({ onCreated }: CreateUserModalProps) {
+export function CreateUserModal({ onCreated, currentRole, companies }: CreateUserModalProps) {
   const [open, setOpen] = useState(false);
   const [state, setState] = useState(USER_INITIAL_STATE);
   const [pending, startTransition] = useTransition();
@@ -20,9 +28,9 @@ export function CreateUserModal({ onCreated }: CreateUserModalProps) {
   const toast = useToast();
 
   const fieldErrors = state.fieldErrors ?? {};
-  // O modal não fecha sozinho no sucesso: a senha temporária aparece uma única
-  // vez e some para sempre se o ADMIN não copiar antes.
-  const createdPassword = state.status === "success" ? state.temporaryPassword : undefined;
+  // O modal não fecha sozinho no sucesso: quando sai senha temporária, ela
+  // aparece uma única vez e some para sempre se ninguém copiar antes.
+  const delivery = state.status === "success" ? state.credential : undefined;
 
   const resetForm = () => {
     setState(USER_INITIAL_STATE);
@@ -37,7 +45,7 @@ export function CreateUserModal({ onCreated }: CreateUserModalProps) {
   const close = () => {
     setOpen(false);
     // A lista só recarrega ao fechar, já com o registro novo no lugar certo.
-    if (createdPassword) onCreated();
+    if (delivery) onCreated();
     resetForm();
   };
 
@@ -50,7 +58,7 @@ export function CreateUserModal({ onCreated }: CreateUserModalProps) {
 
       // Aqui o modal permanece aberto no sucesso (a senha temporária precisa ser
       // copiada), então só o erro geral vira toast.
-      if (result.status === "error" && result.message && !result.fieldErrors) {
+      if (result.status === "error" && result.message && !hasFieldErrors(result.fieldErrors)) {
         toast.error(result.message);
       }
 
@@ -73,14 +81,14 @@ export function CreateUserModal({ onCreated }: CreateUserModalProps) {
         onClose={close}
         size="sm"
         dismissible={!pending}
-        title={createdPassword ? "Usuário cadastrado" : "Novo usuário"}
+        title={delivery ? "Usuário cadastrado" : "Novo usuário"}
         description={
-          createdPassword
-            ? "Repasse a senha abaixo com segurança — ela não aparece de novo."
-            : "O acesso é criado com senha temporária, trocada no primeiro login."
+          delivery
+            ? "Veja abaixo como o acesso foi entregue."
+            : "O convite chega por e-mail; a pessoa define a própria senha pelo link."
         }
         footer={
-          createdPassword ? (
+          delivery ? (
             <Button size="sm" onClick={close}>
               Concluir
             </Button>
@@ -104,13 +112,11 @@ export function CreateUserModal({ onCreated }: CreateUserModalProps) {
           )
         }
       >
-        {createdPassword ? (
-          <div className="flex flex-col gap-5">
-            <Alert tone="warning" title="Senha exibida uma única vez">
-              O sistema guarda apenas o hash. Perdendo este valor, resta redefinir a senha.
-            </Alert>
-            <CopyField label="Senha temporária" value={createdPassword} />
-          </div>
+        {delivery ? (
+          <CredentialDeliveryPanel
+            delivery={delivery}
+            hint="Ele entra no painel com o e-mail cadastrado."
+          />
         ) : (
           <form
             key={formKey}
@@ -119,7 +125,12 @@ export function CreateUserModal({ onCreated }: CreateUserModalProps) {
             className="flex flex-col gap-5"
             noValidate
           >
-            <UserFormFields fieldErrors={fieldErrors} disabled={pending} />
+            <UserFormFields
+              fieldErrors={fieldErrors}
+              disabled={pending}
+              currentRole={currentRole}
+              companies={companies}
+            />
           </form>
         )}
       </Modal>

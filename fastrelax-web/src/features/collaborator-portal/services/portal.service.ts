@@ -9,6 +9,7 @@ import type {
   AvailableSlots,
   BookSessionInput,
   CollaboratorAuthSession,
+  CollaboratorCredentials,
   CollaboratorProfile,
   CollaboratorSession,
   ListMySessionsParams,
@@ -25,10 +26,41 @@ import type {
 
 export const MY_SESSIONS_PAGE_SIZE = 20;
 
-export function collaboratorSignIn(cpf: string): Promise<ApiResult<CollaboratorAuthSession>> {
+export function collaboratorSignIn(
+  credentials: CollaboratorCredentials,
+): Promise<ApiResult<CollaboratorAuthSession>> {
   return apiFetch<CollaboratorAuthSession>("/auth/collaborator/login", {
     method: "POST",
-    body: { cpf },
+    body: credentials,
+  });
+}
+
+/**
+ * Primeiro acesso: troca a senha temporária entregue pelo RH.
+ *
+ * É uma das poucas rotas liberadas enquanto `mustChangePassword` bloqueia o
+ * resto da API — sem ela não haveria como sair da senha temporária.
+ */
+export async function defineFirstAccessPassword(
+  newPassword: string,
+  confirmNewPassword: string,
+): Promise<ApiResult<null>> {
+  return apiFetch<null>("/collaborators/me/first-access-password", {
+    method: "POST",
+    body: { newPassword, confirmNewPassword },
+    token: await readAccessToken(),
+  });
+}
+
+export async function changeMyPassword(
+  currentPassword: string,
+  newPassword: string,
+  confirmNewPassword: string,
+): Promise<ApiResult<null>> {
+  return apiFetch<null>("/collaborators/me/password", {
+    method: "PATCH",
+    body: { currentPassword, newPassword, confirmNewPassword },
+    token: await readAccessToken(),
   });
 }
 

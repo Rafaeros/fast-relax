@@ -20,14 +20,25 @@ import { CreateUserModal } from "@/features/users/components/CreateUserModal";
 import { EditUserModal } from "@/features/users/components/EditUserModal";
 import { UsersFilterModal } from "@/features/users/components/UsersFilterModal";
 import { ViewUserModal } from "@/features/users/components/ViewUserModal";
-import type { User, UserFilter } from "@/features/users/types/user.types";
+import type { CompanyOption, User, UserFilter } from "@/features/users/types/user.types";
+import type { UserRole } from "@/features/authentication/types/auth.types";
+import { ROLE_SHORT_LABELS } from "@/features/authentication/lib/roles";
 
 export type UsersTableProps = {
   initialSlice: PageSlice<User>;
   loadPage: (page: number) => Promise<PageSlice<User>>;
+  /** Papel de quem está logado: define os perfis que ele pode cadastrar. */
+  currentRole: UserRole;
+  /** Empresas para o SYSADMIN escolher; vazio para os demais papéis. */
+  companies?: CompanyOption[];
 };
 
-export function UsersTable({ initialSlice, loadPage }: UsersTableProps) {
+export function UsersTable({
+  initialSlice,
+  loadPage,
+  currentRole,
+  companies,
+}: UsersTableProps) {
   // Incrementar o sinal faz a tabela descartar o que está em tela e recarregar
   // da primeira página — é assim que cadastro e edição aparecem na hora.
   const [reloadSignal, setReloadSignal] = useState(0);
@@ -84,7 +95,7 @@ export function UsersTable({ initialSlice, loadPage }: UsersTableProps) {
         id: "role",
         header: "Perfil",
         hideOnMobile: true,
-        cell: (row) => <Badge tone="neutral">{row.role}</Badge>,
+        cell: (row) => <Badge tone="neutral">{ROLE_SHORT_LABELS[row.role]}</Badge>,
       },
       {
         id: "active",
@@ -146,7 +157,13 @@ export function UsersTable({ initialSlice, loadPage }: UsersTableProps) {
             searchValue={search}
             onSearchChange={setSearch}
             filter={<UsersFilterModal value={filters} onApply={setFilters} />}
-            action={<CreateUserModal onCreated={reload} />}
+            action={
+              <CreateUserModal
+                onCreated={reload}
+                currentRole={currentRole}
+                companies={companies}
+              />
+            }
           />
         }
         emptyMessage={

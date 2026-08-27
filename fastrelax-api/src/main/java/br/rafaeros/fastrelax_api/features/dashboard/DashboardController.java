@@ -25,7 +25,7 @@ public class DashboardController {
     private final DashboardService dashboardService;
 
     @GetMapping("/sessions")
-    @PreAuthorize("@collaboratorSecurity.hasAdminOrRhAccess()")
+    @PreAuthorize("@access.operatesCompany()")
     @Operation(summary = "Métricas de sessões no período, para o painel do RH")
     public ResponseEntity<ApiResponseDTO<DashboardResponseDTO>> summary(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,

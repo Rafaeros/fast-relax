@@ -6,12 +6,17 @@ import { CollaboratorsTable } from "@/features/collaborators/components/Collabor
 import { listCollaborators } from "@/features/collaborators/services/collaborator.service";
 import type { Collaborator } from "@/features/collaborators/types/collaborator.types";
 import { listActiveDepartments } from "@/features/departments/services/department.service";
+import { requireCompanyUser } from "@/features/authentication/lib/guards";
 
 export const metadata: Metadata = {
   title: "Colaboradores — physical",
 };
 
 export default async function ColaboradoresPage() {
+  // O cadastro carrega CPF: por decisão de produto, a equipe da plataforma não
+  // enxerga dado pessoal dos clientes.
+  await requireCompanyUser();
+
   // Primeira página no servidor: a tabela chega preenchida, sem piscar vazia.
   // Departamentos vêm junto porque o cadastro exige um (`departmentId` é @NotNull).
   const [result, departmentsResult] = await Promise.all([

@@ -11,7 +11,7 @@ import type { SessionSettingsFormState } from "@/features/settings/types/session
 const ROUTE = "/painel/configuracao-sessao";
 
 /**
- * Salva as configurações globais das sessões.
+ * Salva as configurações de sessão da empresa em curso.
  *
  * O `PUT` substitui os três valores de uma vez — é assim que o endpoint
  * funciona, então o formulário sempre envia o conjunto completo, mesmo quando

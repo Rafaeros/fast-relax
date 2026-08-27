@@ -38,7 +38,7 @@ public class CollaboratorWorkScheduleController {
     private final CollaboratorWorkScheduleService scheduleService;
 
     @GetMapping("/schedules")
-    @PreAuthorize("@collaboratorSecurity.hasAdminOrRhAccess()")
+    @PreAuthorize("@access.operatesCompany()")
     @Operation(summary = "Lista os horários permitidos cadastrados")
     public ResponseEntity<ApiResponseDTO<Page<CollaboratorWorkScheduleResponseDTO>>> listAll(
             @ParameterObject CollaboratorWorkScheduleFilterDTO filter,
@@ -66,8 +66,8 @@ public class CollaboratorWorkScheduleController {
     }
 
     @GetMapping("/{collaboratorId}/schedules")
-    @PreAuthorize("@collaboratorSecurity.hasAdminOrRhAccess()"
-            + " or @collaboratorSecurity.canAccessCollaborator(#collaboratorId)")
+    @PreAuthorize("@access.operatesCompany()"
+            + " or @access.canAccessCollaborator(#collaboratorId)")
     @Operation(summary = "Semana de horários permitidos de um colaborador")
     public ResponseEntity<ApiResponseDTO<List<CollaboratorWorkScheduleResponseDTO>>> getWeeklySchedule(
             @PathVariable Long collaboratorId) {
@@ -77,7 +77,7 @@ public class CollaboratorWorkScheduleController {
 
     /** Define a semana inteira de uma vez: dias ausentes do corpo são desativados. */
     @PutMapping("/{collaboratorId}/schedules")
-    @PreAuthorize("@collaboratorSecurity.hasAdminOrRhAccess()")
+    @PreAuthorize("@access.operatesCompany()")
     @Operation(summary = "Substitui a semana inteira; dias omitidos são desativados")
     public ResponseEntity<ApiResponseDTO<List<CollaboratorWorkScheduleResponseDTO>>> replaceWeeklySchedule(
             @PathVariable Long collaboratorId,
@@ -88,7 +88,7 @@ public class CollaboratorWorkScheduleController {
     }
 
     @PostMapping("/schedules")
-    @PreAuthorize("@collaboratorSecurity.hasAdminOrRhAccess()")
+    @PreAuthorize("@access.operatesCompany()")
     @Operation(summary = "Cadastra o horário permitido de um único dia")
     public ResponseEntity<ApiResponseDTO<CollaboratorWorkScheduleResponseDTO>> create(
             @RequestBody @Valid CollaboratorWorkScheduleDTO dto) {
@@ -97,7 +97,7 @@ public class CollaboratorWorkScheduleController {
     }
 
     @PutMapping("/schedules/{id}")
-    @PreAuthorize("@collaboratorSecurity.hasAdminOrRhAccess()")
+    @PreAuthorize("@access.operatesCompany()")
     @Operation(summary = "Atualiza o horário permitido de um único dia")
     public ResponseEntity<ApiResponseDTO<CollaboratorWorkScheduleResponseDTO>> update(@PathVariable Long id,
             @RequestBody @Valid CollaboratorWorkScheduleDTO dto) {
@@ -106,7 +106,7 @@ public class CollaboratorWorkScheduleController {
     }
 
     @DeleteMapping("/schedules/{id}")
-    @PreAuthorize("@collaboratorSecurity.hasAdminOrRhAccess()")
+    @PreAuthorize("@access.operatesCompany()")
     @Operation(summary = "Remove o horário permitido de um dia")
     public ResponseEntity<ApiResponseDTO<Void>> delete(@PathVariable Long id) {
         scheduleService.softDelete(id);

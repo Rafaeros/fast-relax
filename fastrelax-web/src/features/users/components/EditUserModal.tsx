@@ -5,6 +5,7 @@ import { Button, Icon, Modal, useToast } from "@/components/ui";
 import { updateUserAction } from "@/features/users/actions/user.actions";
 import { UserFormFields } from "@/features/users/components/UserFormFields";
 import { USER_INITIAL_STATE, type User } from "@/features/users/types/user.types";
+import { hasFieldErrors } from "@/lib/forms";
 
 export type EditUserModalProps = {
   /** `null` mantém o modal fechado — o pai guarda a linha selecionada. */
@@ -43,7 +44,7 @@ export function EditUserModal({ user, onClose, onUpdated }: EditUserModalProps) 
 
       // Erro de campo fica no formulário, ao lado do input a corrigir. O recado
       // geral do servidor vai para o toast, que não depende do modal aberto.
-      if (result.message && !result.fieldErrors) toast.error(result.message);
+      if (result.message && !hasFieldErrors(result.fieldErrors)) toast.error(result.message);
       setState(result);
     });
   };
@@ -87,7 +88,14 @@ export function EditUserModal({ user, onClose, onUpdated }: EditUserModalProps) 
         >
           <input type="hidden" name="id" value={user.id} />
 
-          <UserFormFields fieldErrors={fieldErrors} disabled={pending} user={user} />
+          {/* Na edição o perfil não é editável, então o papel de quem edita não
+              muda nada — vai o do próprio registro só para satisfazer o tipo. */}
+          <UserFormFields
+            fieldErrors={fieldErrors}
+            disabled={pending}
+            user={user}
+            currentRole={user.role}
+          />
         </form>
       )}
     </Modal>

@@ -2,18 +2,48 @@ package br.rafaeros.fastrelax_api.features.collaborators;
 
 import java.util.Optional;
 
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface CollaboratorRepository
-        extends JpaRepository<Collaborator, Long>, JpaSpecificationExecutor<Collaborator> {
+import br.rafaeros.fastrelax_api.core.tenancy.CompanyScopedRepository;
 
-    Optional<Collaborator> findByCpfHash(String cpfHash);
+public interface CollaboratorRepository extends CompanyScopedRepository<Collaborator> {
 
-    // Native query bypasses @SQLRestriction("deleted_at IS NULL") so we can find
-    // soft-deleted rows and reactivate them instead of violating the unique constraint.
-    @Query(value = "SELECT * FROM collaborators WHERE cpf_hash = :cpfHash", nativeQuery = true)
-    Optional<Collaborator> findByCpfHashIncludingDeleted(@Param("cpfHash") String cpfHash);
+    /**
+     * Busca do login: empresa mais blind index do CPF.
+     *
+     * <p>
+     * Roda antes de haver tenant no contexto — é ela quem descobre a empresa —,
+     * então o {@code companyId} vem por parâmetro em vez de vir do
+     * {@code TenantContext}.
+     */
+    Optional<Collaborator> findByCompanyIdAndCpfHash(Long companyId, String cpfHash);
+
+    /**
+     * Busca da recuperação de senha. Roda sem tenant no contexto — quem pede
+     * ainda não está logado —, então o {@code companyId} vem do CNPJ informado na
+     * tela.
+     *
+     * <p>
+     * Ignora caixa porque é isso que o índice {@code uq_collaborators_company_email}
+     * garante: "Ana@x.com" e "ana@x.com" são a mesma conta.
+     */
+    Optional<Collaborator> findByCompanyIdAndEmailIgnoreCase(Long companyId, String email);
+
+    /** Conflito de e-mail dentro da empresa, checado antes de gravar. */
+    Optional<Collaborator> findByCompanyIdAndEmailIgnoreCaseAndIdNot(Long companyId, String email, Long id);
+
+    /**
+     * Enxerga também os removidos, para reativar em vez de violar
+     * {@code uq_collaborators_company_cpf} — a constraint não conhece soft delete.
+     *
+     * <p>
+     * Nativa de propósito: é o único jeito de escapar do
+     * {@code @SQLRestriction}. Por não passar por {@code Specification}, o
+     * {@code company_id} vai explícito.
+     */
+    @Query(value = "SELECT * FROM collaborators WHERE company_id = :companyId AND cpf_hash = :cpfHash",
+            nativeQuery = true)
+    Optional<Collaborator> findByCpfHashIncludingDeleted(@Param("companyId") Long companyId,
+            @Param("cpfHash") String cpfHash);
 }

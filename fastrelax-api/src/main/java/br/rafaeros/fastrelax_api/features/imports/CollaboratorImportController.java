@@ -31,7 +31,7 @@ public class CollaboratorImportController {
 
     /** Modelo .xlsx em branco, com o cabeçalho esperado e uma linha de exemplo. */
     @GetMapping("/template")
-    @PreAuthorize("@collaboratorSecurity.hasAdminOrRhAccess()")
+    @PreAuthorize("@access.operatesCompany()")
     @Operation(summary = "Baixa a planilha modelo com o cabeçalho esperado")
     public ResponseEntity<byte[]> template() {
         return xlsx(exportService.template(), "modelo-colaboradores.xlsx");
@@ -42,7 +42,7 @@ public class CollaboratorImportController {
      * e reenviar. Sem colaboradores, devolve só o cabeçalho.
      */
     @GetMapping("/export")
-    @PreAuthorize("@collaboratorSecurity.hasAdminOrRhAccess()")
+    @PreAuthorize("@access.operatesCompany()")
     @Operation(summary = "Exporta os colaboradores no mesmo layout da importação")
     public ResponseEntity<byte[]> export(
             @RequestParam(name = "onlyActive", defaultValue = "false") boolean onlyActive) {
@@ -54,7 +54,7 @@ public class CollaboratorImportController {
      * Envie como {@code multipart/form-data} no campo {@code file}.
      */
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("@collaboratorSecurity.hasAdminOrRhAccess()")
+    @PreAuthorize("@access.operatesCompany()")
     @Operation(summary = "Importa colaboradores, departamentos e horários permitidos a partir de .xlsx")
     public ResponseEntity<ApiResponseDTO<ImportResultDTO>> importCollaborators(
             @RequestParam("file") MultipartFile file) {

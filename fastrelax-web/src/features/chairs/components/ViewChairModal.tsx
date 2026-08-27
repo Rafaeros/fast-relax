@@ -54,7 +54,8 @@ export function ViewChairModal({ chair, onClose, onEdit, isAdmin = false }: View
           ),
         },
         { label: "MAC address", value: chair.macAddress },
-        { label: "Endereço", value: chair.ipAddress ? `${chair.ipAddress}:${chair.port}` : "—" },
+        { label: "Endereço", value: chair.ipAddress ? `:` : "—" },
+        { label: "Firmware", value: chair.firmwareVersion ?? "Não informado" },
         {
           label: "Situação",
           value: (

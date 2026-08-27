@@ -8,17 +8,24 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import br.rafaeros.fastrelax_api.core.tenancy.CurrentTenant;
 import br.rafaeros.fastrelax_api.features.settings.SessionSettingsService;
 import lombok.RequiredArgsConstructor;
 
 /**
- * Fecha sessões abandonadas.
+ * Fecha sessões abandonadas da empresa em curso.
  *
  * <p>
  * Vive em um bean próprio de propósito: {@link CollaboratorSessionService} chama
  * {@link #expireAbandonedSessions()} antes de cada leitura, e uma chamada a
  * método transacional dentro do mesmo bean não passaria pelo proxy do Spring —
  * a transação seria silenciosamente ignorada.
+ *
+ * <p>
+ * O escopo é de uma empresa por vez, e não por comodidade: a tolerância de
+ * início é configuração de cada cliente, então varrer todo mundo numa consulta
+ * só aplicaria o prazo errado a quase todos. Quem precisa passar por todas —
+ * o job de fundo — usa {@link SessionExpirationSweeper}.
  */
 @Service
 @RequiredArgsConstructor
@@ -31,6 +38,7 @@ public class SessionExpirationService {
     private final SessionSettingsService sessionSettingsService;
     private final br.rafaeros.fastrelax_api.features.chairs.ChairCommandService chairCommandService;
     private final org.springframework.context.ApplicationEventPublisher events;
+    private final CurrentTenant currentTenant;
 
     /**
      * Fecha as sessões ativas que chegaram ao fim, com desfechos diferentes:
@@ -53,7 +61,7 @@ public class SessionExpirationService {
         int graceMinutes = sessionSettingsService.getStartGraceMinutes();
 
         List<CollaboratorSession> candidates = sessionRepository
-                .findByStatusInAndSessionDateLessThanEqual(ACTIVE_STATUSES, today);
+                .findByCompanyIdAndStatusInAndSessionDateLessThanEqual(currentTenant.companyId(), ACTIVE_STATUSES, today);
 
         // Loop em vez de peek(): mutar dentro de um stream depende de ele ser
         // consumido, o que torna o efeito colateral frágil e difícil de ler.

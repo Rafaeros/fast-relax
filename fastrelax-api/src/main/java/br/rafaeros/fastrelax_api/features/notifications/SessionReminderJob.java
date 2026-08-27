@@ -16,7 +16,7 @@ import org.springframework.stereotype.Component;
 
 import br.rafaeros.fastrelax_api.features.collaborators.CollaboratorSession;
 import br.rafaeros.fastrelax_api.features.collaborators.CollaboratorSessionRepository;
-import br.rafaeros.fastrelax_api.features.collaborators.SessionExpirationService;
+import br.rafaeros.fastrelax_api.features.collaborators.SessionExpirationSweeper;
 import br.rafaeros.fastrelax_api.features.collaborators.SessionStatus;
 import lombok.RequiredArgsConstructor;
 
@@ -45,7 +45,7 @@ public class SessionReminderJob {
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm");
 
     private final CollaboratorSessionRepository sessionRepository;
-    private final SessionExpirationService sessionExpirationService;
+    private final SessionExpirationSweeper sessionExpirationSweeper;
     private final SessionReminderSender sender;
 
     /** Antecedências das faixas rolantes, em minutos. */
@@ -104,7 +104,7 @@ public class SessionReminderJob {
      */
     @EventListener(ApplicationReadyEvent.class)
     public void catchUpOnStartup() {
-        int closed = sessionExpirationService.expireAbandonedSessions();
+        int closed = sessionExpirationSweeper.sweepAllCompanies();
         if (closed > 0) {
             log.info("Inicialização: {} sessão(ões) encerrada(s) por atraso", closed);
         }

@@ -4,14 +4,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Icon } from "@/components/ui";
-import { MOBILE_TAB_LABELS, PANEL_NAV, type PanelNavItem } from "@/config/navigation";
+import { MOBILE_TAB_LABELS, type PanelNavItem } from "@/config/navigation";
 import { cn } from "@/lib/cn";
 
-const PRIMARY = PANEL_NAV.filter((item) => item.mobilePrimary);
-const SECONDARY = PANEL_NAV.filter((item) => !item.mobilePrimary);
 
-function isActive(pathname: string, href: string): boolean {
-  return href === "/painel" ? pathname === href : pathname.startsWith(href);
+function isActive(pathname: string, href: string, homeHref: string): boolean {
+  return href === homeHref ? pathname === href : pathname.startsWith(href);
 }
 
 /** Rótulo curto na aba; o nome completo continua no menu "Mais". */
@@ -27,8 +25,17 @@ function tabLabel(item: PanelNavItem): string {
  * `env(safe-area-inset-bottom)` para as abas não ficarem sob a barra de gestos
  * quando o app roda empacotado pelo Capacitor.
  */
-export function PanelTabBar() {
+export type PanelTabBarProps = {
+  /** Ja filtrado pelo papel de quem esta logado — ver `panelNavFor`. */
+  items: PanelNavItem[];
+  /** Rota do primeiro destino do papel; so ela exige correspondencia exata. */
+  homeHref: string;
+};
+
+export function PanelTabBar({ items, homeHref }: PanelTabBarProps) {
   const pathname = usePathname();
+  const primaryItems = items.filter((item) => item.mobilePrimary);
+  const secondaryItems = items.filter((item) => !item.mobilePrimary);
   // A rota em que a folha foi aberta viaja junto com o estado: quando o
   // pathname muda, `openedAt` deixa de bater e ela fecha sozinha, sem efeito
   // sincronizando estado.
@@ -49,7 +56,7 @@ export function PanelTabBar() {
     };
   }, [menuOpen]);
 
-  const secondaryActive = SECONDARY.some((item) => isActive(pathname, item.href));
+  const secondaryActive = secondaryItems.some((item) => isActive(pathname, item.href, homeHref));
 
   return (
     <>
@@ -87,8 +94,8 @@ export function PanelTabBar() {
         </div>
 
         <ul className="flex min-h-0 flex-col gap-1 overflow-y-auto p-3">
-          {SECONDARY.map((item) => {
-            const active = isActive(pathname, item.href);
+          {secondaryItems.map((item) => {
+            const active = isActive(pathname, item.href, homeHref);
             return (
               <li key={item.href}>
                 <Link
@@ -123,8 +130,8 @@ export function PanelTabBar() {
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         <ul className="flex items-stretch">
-          {PRIMARY.map((item) => {
-            const active = isActive(pathname, item.href) && !menuOpen;
+          {primaryItems.map((item) => {
+            const active = isActive(pathname, item.href, homeHref) && !menuOpen;
             return (
               <li key={item.href} className="flex-1">
                 <Link

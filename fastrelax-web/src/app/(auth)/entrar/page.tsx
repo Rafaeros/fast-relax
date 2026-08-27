@@ -1,17 +1,24 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Card, Icon, Logo } from "@/components/ui";
+import { Alert, Card, Icon, Logo } from "@/components/ui";
 import { LoginBrandPanel } from "@/features/authentication/components/LoginBrandPanel";
 import { LoginForm } from "@/features/authentication/components/LoginForm";
 import { getCurrentUser } from "@/features/authentication/services/auth.service";
 
 export const metadata: Metadata = {
   title: "Entrar — physical",
-  description: "Acesso ao painel administrativo de RH da physical.",
+  description: "Acesso ao painel da physical.",
 };
 
-export default async function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ senha?: string }>;
+}) {
+  // Vem do redirecionamento pós-redefinição: confirma que deu certo, já que a
+  // ação não abre sessão sozinha.
+  const { senha } = await searchParams;
   // Quem já tem sessão válida não vê o formulário de novo.
   const user = await getCurrentUser();
   if (user) redirect("/painel");
@@ -41,6 +48,12 @@ export default async function LoginPage() {
               colaboradores e indicadores.
             </p>
           </div>
+
+          {senha === "ok" && (
+            <Alert tone="success" title="Senha definida">
+              Entre com a senha que você acabou de escolher.
+            </Alert>
+          )}
 
           <Card padding="lg">
             <LoginForm />

@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Alert, Badge, Button, CopyField, DetailList, Icon, Modal, useToast } from "@/components/ui";
+import { roleLabel } from "@/features/authentication/lib/roles";
 import type { DetailItem } from "@/components/ui";
 import {
   resetUserPasswordAction,
@@ -74,7 +75,8 @@ export function ViewUserModal({ user, onClose, onEdit, onChanged }: ViewUserModa
     ? [
         { label: "Nome", value: user.name },
         { label: "E-mail", value: user.email },
-        { label: "Perfil", value: <Badge tone="neutral">{user.role}</Badge> },
+        { label: "Perfil", value: <Badge tone="neutral">{roleLabel(user)}</Badge> },
+        { label: "Empresa", value: user.companyName ?? "Equipe da plataforma" },
         {
           label: "Situação",
           value: (

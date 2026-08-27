@@ -11,35 +11,55 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import br.rafaeros.fastrelax_api.core.security.CredentialHolder;
+import br.rafaeros.fastrelax_api.core.tenancy.TenantPrincipal;
+import br.rafaeros.fastrelax_api.features.auth.RefreshToken;
+import br.rafaeros.fastrelax_api.features.companies.Company;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+/**
+ * Usuário do painel.
+ *
+ * <p>
+ * É a única entidade cujo vínculo com empresa é opcional, e por isso não herda
+ * de {@code CompanyScopedEntity}: o SYSADMIN é da Physical e não pertence a
+ * cliente nenhum. A constraint {@code chk_users_company_role} garante no banco
+ * que os dois casos não se misturem — plataforma sem empresa, cliente com.
+ */
 @Entity
 @Table(name = "users")
 @SQLRestriction("deleted_at IS NULL")
-@AllArgsConstructor
 @NoArgsConstructor
 @Getter
 @Setter
-public class User implements UserDetails {
+public class User implements UserDetails, TenantPrincipal, CredentialHolder {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /** Nulo apenas para {@link UserRole#SYSADMIN}. */
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "company_id", updatable = false)
+    private Company company;
+
     @Column(nullable = false, length = 120)
     private String name;
 
-    @Column(unique = true, nullable = false, length = 120)
+    @Column(unique = true, nullable = false, length = 180)
     private String email;
 
     @Column(name = "password_hash", nullable = false)
@@ -71,6 +91,16 @@ public class User implements UserDetails {
     private LocalDateTime deletedAt;
 
     @Override
+    public Long tenantCompanyId() {
+        return company == null ? null : company.getId();
+    }
+
+    @Override
+    public RefreshToken.SubjectType subjectType() {
+        return RefreshToken.SubjectType.USER;
+    }
+
+    @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return List.of(new SimpleGrantedAuthority("ROLE_" + role.name()));
     }
@@ -100,8 +130,14 @@ public class User implements UserDetails {
         return true;
     }
 
+    /**
+     * Empresa suspensa derruba quem trabalha nela: sem esta checagem, o gestor de
+     * um contrato encerrado continuaria operando o painel até o token expirar.
+     */
     @Override
     public boolean isEnabled() {
-        return this.active && this.deletedAt == null;
+        return active
+                && deletedAt == null
+                && (company == null || company.isEnabled());
     }
 }

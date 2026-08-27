@@ -40,7 +40,7 @@ public class DepartmentController {
     private final DepartmentService departmentService;
 
     @GetMapping
-    @PreAuthorize("@collaboratorSecurity.hasAdminOrRhAccess()")
+    @PreAuthorize("@access.operatesCompany()")
     @Operation(summary = "Lista os departamentos")
     public ResponseEntity<ApiResponseDTO<Page<DepartmentResponseDTO>>> listAll(
             @ParameterObject DepartmentFilterDTO filter,
@@ -50,7 +50,7 @@ public class DepartmentController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("@collaboratorSecurity.hasAdminOrRhAccess()")
+    @PreAuthorize("@access.operatesCompany()")
     @Operation(summary = "Busca um departamento por id")
     public ResponseEntity<ApiResponseDTO<DepartmentResponseDTO>> getById(@PathVariable Long id) {
         DepartmentResponseDTO department = departmentService.findById(id);
@@ -58,7 +58,7 @@ public class DepartmentController {
     }
 
     @PostMapping
-    @PreAuthorize("@collaboratorSecurity.hasAdminOrRhAccess()")
+    @PreAuthorize("@access.operatesCompany()")
     @Operation(summary = "Cadastra um departamento")
     public ResponseEntity<ApiResponseDTO<DepartmentResponseDTO>> create(@RequestBody @Valid CreateDepartmentDTO dto) {
         DepartmentResponseDTO department = departmentService.create(dto);
@@ -67,7 +67,7 @@ public class DepartmentController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("@collaboratorSecurity.hasAdminOrRhAccess()")
+    @PreAuthorize("@access.operatesCompany()")
     @Operation(summary = "Atualiza um departamento")
     public ResponseEntity<ApiResponseDTO<DepartmentResponseDTO>> update(@PathVariable Long id,
             @RequestBody @Valid DepartmentRequestDTO dto) {
@@ -76,7 +76,7 @@ public class DepartmentController {
     }
 
     @PatchMapping("/{id}/toggle-active")
-    @PreAuthorize("@collaboratorSecurity.hasAdminOrRhAccess()")
+    @PreAuthorize("@access.operatesCompany()")
     @Operation(summary = "Ativa ou desativa um departamento")
     public ResponseEntity<ApiResponseDTO<DepartmentResponseDTO>> toggleActive(@PathVariable Long id) {
         DepartmentResponseDTO department = departmentService.toggleActive(id);
@@ -84,7 +84,7 @@ public class DepartmentController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("@collaboratorSecurity.hasAdminOrRhAccess()")
+    @PreAuthorize("@access.operatesCompany()")
     @Operation(summary = "Remove um departamento (soft delete)")
     public ResponseEntity<ApiResponseDTO<Void>> delete(@PathVariable Long id) {
         departmentService.softDelete(id);

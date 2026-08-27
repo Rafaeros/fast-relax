@@ -4,9 +4,13 @@ import { useState, useTransition, type FormEvent } from "react";
 import { Button, Icon, Modal, useToast } from "@/components/ui";
 import { updateChairAction } from "@/features/chairs/actions/chair.actions";
 import { ChairFormFields } from "@/features/chairs/components/ChairFormFields";
+import type { FirmwareOption } from "@/features/chairs/types/chair.types";
 import { CHAIR_INITIAL_STATE, type Chair } from "@/features/chairs/types/chair.types";
+import { hasFieldErrors } from "@/lib/forms";
 
 export type EditChairModalProps = {
+  /** Versões do catálogo, para registrar o firmware gravado. */
+  firmwares?: FirmwareOption[];
   /** `null` mantém o modal fechado — o pai guarda a linha selecionada. */
   chair: Chair | null;
   onClose: () => void;
@@ -14,7 +18,7 @@ export type EditChairModalProps = {
   onUpdated: () => void;
 };
 
-export function EditChairModal({ chair, onClose, onUpdated }: EditChairModalProps) {
+export function EditChairModal({ chair, onClose, onUpdated, firmwares }: EditChairModalProps) {
   const [state, setState] = useState(CHAIR_INITIAL_STATE);
   const [pending, startTransition] = useTransition();
   const toast = useToast();
@@ -43,7 +47,7 @@ export function EditChairModal({ chair, onClose, onUpdated }: EditChairModalProp
 
       // Erro de campo fica no formulário, ao lado do input a corrigir. O recado
       // geral do servidor vai para o toast, que não depende do modal aberto.
-      if (result.message && !result.fieldErrors) toast.error(result.message);
+      if (result.message && !hasFieldErrors(result.fieldErrors)) toast.error(result.message);
       setState(result);
     });
   };
@@ -87,7 +91,12 @@ export function EditChairModal({ chair, onClose, onUpdated }: EditChairModalProp
         >
           <input type="hidden" name="id" value={chair.id} />
 
-          <ChairFormFields fieldErrors={fieldErrors} disabled={pending} chair={chair} />
+          <ChairFormFields
+            fieldErrors={fieldErrors}
+            disabled={pending}
+            chair={chair}
+            firmwares={firmwares}
+          />
         </form>
       )}
     </Modal>

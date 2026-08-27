@@ -22,7 +22,7 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/login")
-    @Operation(summary = "Login de usuário ADMIN/RH por email e senha")
+    @Operation(summary = "Login de usuário do painel por email e senha")
     public ResponseEntity<ApiResponseDTO<LoginResponseDTO>> login(@RequestBody @Valid LoginRequestDTO data,
             HttpServletRequest request) {
         LoginResponseDTO response = authService.login(data, clientKey(request));
@@ -30,7 +30,7 @@ public class AuthController {
     }
 
     @PostMapping("/collaborator/login")
-    @Operation(summary = "Login de colaborador por CPF")
+    @Operation(summary = "Login de colaborador por CNPJ da empresa, CPF e senha")
     public ResponseEntity<ApiResponseDTO<CollaboratorLoginResponseDTO>> collaboratorLogin(
             @RequestBody @Valid CollaboratorLoginRequestDTO data, HttpServletRequest request) {
         CollaboratorLoginResponseDTO response = authService.collaboratorLogin(data, clientKey(request));

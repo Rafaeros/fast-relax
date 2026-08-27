@@ -4,14 +4,18 @@ import { useState, useTransition, type FormEvent } from "react";
 import { Button, Icon, Modal, useToast } from "@/components/ui";
 import { createChairAction } from "@/features/chairs/actions/chair.actions";
 import { ChairFormFields } from "@/features/chairs/components/ChairFormFields";
+import type { FirmwareOption } from "@/features/chairs/types/chair.types";
 import { CHAIR_INITIAL_STATE } from "@/features/chairs/types/chair.types";
+import { hasFieldErrors } from "@/lib/forms";
 
 export type CreateChairModalProps = {
+  /** Versões do catálogo, para registrar o firmware gravado. */
+  firmwares?: FirmwareOption[];
   /** Disparado após o cadastro dar certo — a tabela recarrega a partir daqui. */
   onCreated: () => void;
 };
 
-export function CreateChairModal({ onCreated }: CreateChairModalProps) {
+export function CreateChairModal({ onCreated, firmwares }: CreateChairModalProps) {
   const [open, setOpen] = useState(false);
   const [state, setState] = useState(CHAIR_INITIAL_STATE);
   const [pending, startTransition] = useTransition();
@@ -48,7 +52,7 @@ export function CreateChairModal({ onCreated }: CreateChairModalProps) {
 
       // Erro de campo fica no formulário, ao lado do input a corrigir. O recado
       // geral do servidor vai para o toast, que não depende do modal aberto.
-      if (result.message && !result.fieldErrors) toast.error(result.message);
+      if (result.message && !hasFieldErrors(result.fieldErrors)) toast.error(result.message);
       setState(result);
     });
   };
@@ -92,7 +96,7 @@ export function CreateChairModal({ onCreated }: CreateChairModalProps) {
           className="flex flex-col gap-5"
           noValidate
         >
-          <ChairFormFields fieldErrors={fieldErrors} disabled={pending} />
+          <ChairFormFields fieldErrors={fieldErrors} disabled={pending} firmwares={firmwares} />
         </form>
       </Modal>
     </>

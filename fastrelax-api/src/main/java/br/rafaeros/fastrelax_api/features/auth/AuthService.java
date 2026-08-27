@@ -1,15 +1,22 @@
 package br.rafaeros.fastrelax_api.features.auth;
 
+import java.util.Optional;
+
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.stereotype.Service;
 
+import br.rafaeros.fastrelax_api.core.crypto.CryptoService;
 import br.rafaeros.fastrelax_api.core.exceptions.BusinessException;
+import br.rafaeros.fastrelax_api.core.security.CredentialService;
 import br.rafaeros.fastrelax_api.core.security.LoginRateLimiter;
 import br.rafaeros.fastrelax_api.core.security.TokenService;
+import br.rafaeros.fastrelax_api.core.util.CnpjUtils;
+import br.rafaeros.fastrelax_api.core.util.CpfUtils;
 import br.rafaeros.fastrelax_api.features.collaborators.Collaborator;
 import br.rafaeros.fastrelax_api.features.collaborators.CollaboratorRepository;
-import br.rafaeros.fastrelax_api.features.collaborators.CollaboratorService;
+import br.rafaeros.fastrelax_api.features.companies.Company;
+import br.rafaeros.fastrelax_api.features.companies.CompanyRepository;
 import br.rafaeros.fastrelax_api.features.users.User;
 import br.rafaeros.fastrelax_api.features.users.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -18,10 +25,22 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class AuthService {
 
+    /**
+     * Uma resposta só para toda recusa do login do colaborador.
+     *
+     * <p>
+     * Empresa inexistente, CPF que não está lá, senha errada e cadastro
+     * desativado dizem exatamente a mesma coisa. Diferenciá-los seria entregar,
+     * de graça, quem é cliente da Physical e quem trabalha em cada cliente.
+     */
+    private static final String INVALID_CREDENTIALS = "CNPJ, CPF ou senha inválidos";
+
     private final AuthenticationManager authenticationManager;
     private final TokenService tokenService;
-    private final CollaboratorService collaboratorService;
+    private final CredentialService credentialService;
+    private final CryptoService cryptoService;
     private final CollaboratorRepository collaboratorRepository;
+    private final CompanyRepository companyRepository;
     private final UserRepository userRepository;
     private final RefreshTokenService refreshTokenService;
     private final LoginRateLimiter loginRateLimiter;
@@ -41,20 +60,63 @@ public class AuthService {
                 user.isMustChangePassword());
     }
 
+    /**
+     * Login do colaborador: empresa pelo CNPJ, pessoa pelo blind index do CPF,
+     * credencial pela senha.
+     *
+     * <p>
+     * Antes o blind index fazia os três papéis de uma vez — encontrar a pessoa
+     * <em>era</em> autenticá-la. O acesso valia, na prática, o que vale um CPF,
+     * que circula em qualquer cadastro; a senha é o que separa identificar de
+     * provar identidade.
+     */
     public CollaboratorLoginResponseDTO collaboratorLogin(CollaboratorLoginRequestDTO data, String clientKey) {
         loginRateLimiter.checkAndRegister(clientKey);
 
-        // O blind index faz a busca ser a própria verificação de credencial:
-        // só o CPF correto produz o digest armazenado.
-        Collaborator collaborator = collaboratorService.findByCpf(data.cpf());
+        Collaborator collaborator = findCandidate(data)
+                .orElseThrow(() -> {
+                    // Gasta o tempo de um bcrypt mesmo sem ter contra o que comparar:
+                    // a resposta rápida denunciaria que o CPF não existe naquela empresa.
+                    credentialService.wasteMatch(data.password());
+                    return new BusinessException(INVALID_CREDENTIALS);
+                });
+
+        if (!credentialService.matches(collaborator, data.password()) || !collaborator.isEnabled()) {
+            throw new BusinessException(INVALID_CREDENTIALS);
+        }
 
         loginRateLimiter.reset(clientKey);
+        Company company = collaborator.getCompany();
         return new CollaboratorLoginResponseDTO(
                 tokenService.generateToken(collaborator),
                 refreshTokenService.issue(RefreshToken.SubjectType.COLLABORATOR, collaborator.getId()),
                 tokenService.getAccessTokenExpirationSeconds(),
                 collaborator.getId(),
-                collaborator.getName());
+                collaborator.getName(),
+                company.getId(),
+                company.getName(),
+                collaborator.isMustChangePassword());
+    }
+
+    /**
+     * CNPJ e CPF malformados morrem aqui em silêncio, como um cadastro que não
+     * existe. Deixá-los estourar em {@code CpfUtils} produziria "CPF inválido" —
+     * uma mensagem diferente da de senha errada, e portanto um oráculo.
+     */
+    private Optional<Collaborator> findCandidate(CollaboratorLoginRequestDTO data) {
+        String cnpj = CnpjUtils.normalizeQuietly(data.cnpj());
+        if (!CnpjUtils.hasValidCheckDigits(cnpj)) {
+            return Optional.empty();
+        }
+        String cpf = data.cpf() == null ? "" : data.cpf().replaceAll("\\D", "");
+        if (!CpfUtils.hasValidCheckDigits(cpf)) {
+            return Optional.empty();
+        }
+
+        return companyRepository.findByCnpj(cnpj)
+                .filter(Company::isEnabled)
+                .flatMap(company -> collaboratorRepository
+                        .findByCompanyIdAndCpfHash(company.getId(), cryptoService.blindIndex(cpf)));
     }
 
     /**
@@ -66,7 +128,7 @@ public class AuthService {
 
         if (consumed.getSubjectType() == RefreshToken.SubjectType.USER) {
             User user = userRepository.findById(consumed.getSubjectId())
-                    .filter(candidate -> candidate.isEnabled())
+                    .filter(User::isEnabled)
                     .orElseThrow(() -> new BusinessException("Usuário indisponível. Faça login novamente."));
             return new LoginResponseDTO(
                     tokenService.generateToken(user),
@@ -75,17 +137,17 @@ public class AuthService {
                     user.isMustChangePassword());
         }
 
-        // Revalida o estado atual: quem foi desativado depois do login não renova.
+        // Revalida o estado atual: quem foi desativado — ou cuja empresa foi
+        // suspensa — depois do login não renova.
         Collaborator collaborator = collaboratorRepository.findById(consumed.getSubjectId())
-                .filter(candidate -> candidate.isEnabled())
+                .filter(Collaborator::isEnabled)
                 .orElseThrow(() -> new BusinessException(
                         "Seu acesso está desativado. Entre em contato com o RH."));
-        // Colaborador não tem senha: o CPF é a credencial, então nunca há troca pendente.
         return new LoginResponseDTO(
                 tokenService.generateToken(collaborator),
                 refreshTokenService.issue(RefreshToken.SubjectType.COLLABORATOR, collaborator.getId()),
                 tokenService.getAccessTokenExpirationSeconds(),
-                false);
+                collaborator.isMustChangePassword());
     }
 
     /** Invalida apenas o dispositivo que fez logout. */

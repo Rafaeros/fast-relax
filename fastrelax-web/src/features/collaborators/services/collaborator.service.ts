@@ -6,14 +6,16 @@ import { readAccessToken } from "@/features/authentication/services/session.serv
 import type {
   Collaborator,
   CreateCollaboratorInput,
+  CreatedCollaborator,
   ListCollaboratorsParams,
   UpdateCollaboratorInput,
 } from "@/features/collaborators/types/collaborator.types";
 
 /**
  * Acesso à API de colaboradores (`/collaborators`).
- * Todas as rotas exigem ADMIN ou RH — o token sai do cookie httpOnly, então
- * estas funções só rodam no servidor (Server Component ou Server Action).
+ * Todas as rotas exigem gestor ou RH da empresa — o token sai do cookie
+ * httpOnly, então estas funções só rodam no servidor (Server Component ou
+ * Server Action).
  */
 
 const RESOURCE = "/collaborators";
@@ -56,12 +58,26 @@ export async function getCollaborator(id: number): Promise<ApiResult<Collaborato
   return apiFetch<Collaborator>(`${RESOURCE}/${id}`, { token: await readAccessToken() });
 }
 
+/**
+ * Cadastra e devolve a senha temporária de primeiro acesso — a única vez que
+ * ela existe fora do cliente, já que o banco guarda apenas o hash.
+ */
 export async function createCollaborator(
   input: CreateCollaboratorInput,
-): Promise<ApiResult<Collaborator>> {
-  return apiFetch<Collaborator>(RESOURCE, {
+): Promise<ApiResult<CreatedCollaborator>> {
+  return apiFetch<CreatedCollaborator>(RESOURCE, {
     method: "POST",
     body: { ...input, cpf: input.cpf.replace(/\D/g, "") },
+    token: await readAccessToken(),
+  });
+}
+
+/** Redefinição pelo RH: gera outra temporária e obriga a troca no próximo acesso. */
+export async function resetCollaboratorPassword(
+  id: number,
+): Promise<ApiResult<{ temporaryPassword: string }>> {
+  return apiFetch<{ temporaryPassword: string }>(`${RESOURCE}/${id}/password`, {
+    method: "PATCH",
     token: await readAccessToken(),
   });
 }

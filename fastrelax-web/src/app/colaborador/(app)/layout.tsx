@@ -24,6 +24,10 @@ export default async function CollaboratorAppLayout({ children }: { children: Re
   const collaborator = await getCurrentCollaborator();
   if (!collaborator) redirect("/colaborador/entrar");
 
+  // Com senha temporária o backend bloqueia todo o resto da API: qualquer tela
+  // daqui renderizaria erro, então o caminho é um só.
+  if (collaborator.mustChangePassword) redirect("/colaborador/definir-senha");
+
   const firstName = collaborator.name.trim().split(/\s+/)[0];
 
   return (

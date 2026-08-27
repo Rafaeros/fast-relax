@@ -66,3 +66,34 @@ export function formatPhone(phone: string): string {
   }
   return phone;
 }
+
+/** 12345678000190 → 12.345.678/0001-90 */
+export function formatCnpj(cnpj: string): string {
+  const digits = cnpj.replace(/\D/g, "");
+  if (digits.length !== 14) return cnpj;
+  return digits.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, "$1.$2.$3/$4-$5");
+}
+
+/** Máscara progressiva de CNPJ, para digitação. */
+export function maskCnpjInput(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 14);
+
+  return digits
+    .replace(/^(\d{2})(\d)/, "$1.$2")
+    .replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
+    .replace(/\.(\d{3})(\d)/, ".$1/$2")
+    .replace(/(\d{4})(\d{1,2})$/, "$1-$2");
+}
+
+/** 86010000 → 86010-000 */
+export function formatCep(cep: string): string {
+  const digits = cep.replace(/\D/g, "");
+  if (digits.length !== 8) return cep;
+  return digits.replace(/(\d{5})(\d{3})/, "$1-$2");
+}
+
+/** Máscara progressiva de CEP, para digitação. */
+export function maskCepInput(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 8);
+  return digits.replace(/^(\d{5})(\d)/, "$1-$2");
+}

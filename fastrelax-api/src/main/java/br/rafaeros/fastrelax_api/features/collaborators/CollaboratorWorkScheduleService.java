@@ -13,10 +13,12 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import br.rafaeros.fastrelax_api.core.security.Principals;
+import br.rafaeros.fastrelax_api.core.tenancy.TenantSpecifications;
+import br.rafaeros.fastrelax_api.core.security.AccessGuard;
 import br.rafaeros.fastrelax_api.core.exceptions.BusinessException;
 import br.rafaeros.fastrelax_api.core.exceptions.ResourceNotFoundException;
 import br.rafaeros.fastrelax_api.features.collaborators.dtos.CollaboratorWorkScheduleDTO;
@@ -32,24 +34,21 @@ public class CollaboratorWorkScheduleService {
 
     private final CollaboratorWorkScheduleRepository scheduleRepository;
     private final CollaboratorRepository collaboratorRepository;
-    private final CollaboratorSecurity collaboratorSecurity;
+    private final AccessGuard access;
 
     public Page<CollaboratorWorkScheduleResponseDTO> findAll(CollaboratorWorkScheduleFilterDTO dto,
             @org.springframework.lang.NonNull Pageable pageable) {
-        // A logged collaborator may only see their own schedules, so their id
-        // overrides any collaboratorId supplied in the filter.
+        // Colaborador logado só vê as próprias linhas: o id dele sobrepõe qualquer
+        // collaboratorId que venha no filtro.
         Long collaboratorId = dto != null ? dto.collaboratorId() : null;
-        var authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication != null && authentication.getPrincipal() instanceof Collaborator loggedCollab) {
-            collaboratorId = loggedCollab.getId();
-        }
+        collaboratorId = Principals.collaborator().map(Collaborator::getId).orElse(collaboratorId);
 
         Specification<CollaboratorWorkSchedule> spec = Specification.allOf(
                 CollaboratorWorkScheduleSpecifications.hasDayOfWeek(dto != null ? dto.dayOfWeek() : null),
                 CollaboratorWorkScheduleSpecifications.hasActive(dto != null ? dto.active() : null),
                 CollaboratorWorkScheduleSpecifications.hasCollaborator(collaboratorId));
 
-        return scheduleRepository.findAll(spec, Objects.requireNonNull(pageable))
+        return scheduleRepository.findAll(scopedToCompany(spec), Objects.requireNonNull(pageable))
                 .map(schedule -> new CollaboratorWorkScheduleResponseDTO(schedule));
     }
 
@@ -59,11 +58,7 @@ public class CollaboratorWorkScheduleService {
 
     /** Semana do colaborador logado, sem precisar informar o id. */
     public List<CollaboratorWorkScheduleResponseDTO> findMyWeeklySchedule() {
-        var authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !(authentication.getPrincipal() instanceof Collaborator logged)) {
-            throw new AccessDeniedException("Rota disponível apenas para colaboradores autenticados");
-        }
-        return findWeeklySchedule(logged.getId());
+        return findWeeklySchedule(Principals.requireCollaborator().getId());
     }
 
     /** Every active weekday configured for a collaborator, ordered Monday to Friday. */
@@ -83,7 +78,7 @@ public class CollaboratorWorkScheduleService {
     @Transactional
     public List<CollaboratorWorkScheduleResponseDTO> replaceWeeklySchedule(Long collaboratorId,
             WeeklyScheduleRequestDTO dto) {
-        Collaborator collaborator = collaboratorRepository.findById(Objects.requireNonNull(collaboratorId))
+        Collaborator collaborator = collaboratorRepository.findByIdScoped(Objects.requireNonNull(collaboratorId))
                 .orElseThrow(() -> new ResourceNotFoundException("Colaborador não encontrado"));
 
         Map<WorkDay, WorkScheduleItemDTO> requested = indexByDay(dto.schedules());
@@ -131,7 +126,7 @@ public class CollaboratorWorkScheduleService {
 
     @Transactional
     public CollaboratorWorkScheduleResponseDTO create(CollaboratorWorkScheduleDTO dto) {
-        Collaborator collaborator = collaboratorRepository.findById(Objects.requireNonNull(dto.collaboratorId()))
+        Collaborator collaborator = collaboratorRepository.findByIdScoped(Objects.requireNonNull(dto.collaboratorId()))
                 .orElseThrow(() -> new ResourceNotFoundException("Colaborador não encontrado"));
         validateAllowedWindow(dto.allowedStartTime(), dto.allowedEndTime());
 
@@ -166,7 +161,7 @@ public class CollaboratorWorkScheduleService {
         CollaboratorWorkSchedule schedule = findEntityById(Objects.requireNonNull(id));
         validateAllowedWindow(dto.allowedStartTime(), dto.allowedEndTime());
 
-        Collaborator collaborator = collaboratorRepository.findById(Objects.requireNonNull(dto.collaboratorId()))
+        Collaborator collaborator = collaboratorRepository.findByIdScoped(Objects.requireNonNull(dto.collaboratorId()))
                 .orElseThrow(() -> new ResourceNotFoundException("Colaborador não encontrado"));
 
         schedule.setCollaborator(collaborator);
@@ -186,16 +181,27 @@ public class CollaboratorWorkScheduleService {
         scheduleRepository.save(schedule);
     }
 
+    /**
+     * O horário não tem {@code company_id} próprio: ele pertence à empresa do
+     * colaborador. Por isso o predicado de tenant navega até lá, em vez de usar o
+     * caminho direto das demais entidades.
+     */
+    private Specification<CollaboratorWorkSchedule> scopedToCompany(Specification<CollaboratorWorkSchedule> spec) {
+        return Specification.allOf(spec,
+                TenantSpecifications.<CollaboratorWorkSchedule>currentCompany("collaborator", "company"));
+    }
+
     private CollaboratorWorkSchedule findEntityById(Long id) {
-        CollaboratorWorkSchedule schedule = scheduleRepository.findById(Objects.requireNonNull(id))
+        CollaboratorWorkSchedule schedule = scheduleRepository
+                .findOne(scopedToCompany(TenantSpecifications.hasId(Objects.requireNonNull(id))))
                 .orElseThrow(() -> new ResourceNotFoundException("Horário de trabalho não encontrado"));
         requireCollaboratorAccess(schedule.getCollaborator().getId());
         return schedule;
     }
 
     private void requireCollaboratorAccess(Long collaboratorId) {
-        if (!collaboratorSecurity.hasAdminOrRhAccess()
-                && !collaboratorSecurity.canAccessCollaborator(collaboratorId)) {
+        if (!access.operatesCompany()
+                && !access.canAccessCollaborator(collaboratorId)) {
             throw new AccessDeniedException("Acesso negado. Você só pode acessar seus próprios horários.");
         }
     }

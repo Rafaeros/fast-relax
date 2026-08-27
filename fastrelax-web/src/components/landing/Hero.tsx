@@ -10,9 +10,10 @@ const STATS = [
 
 export function Hero() {
   return (
-    // pt menor no celular: a navbar tem 64px, e 128px de folga empurrava o
-    // título para fora da primeira dobra em telas de 640px de altura.
-    <section id="inicio" className="relative overflow-hidden pt-24 pb-14 sm:pt-40 sm:pb-28">
+    // O respiro do topo só existe a partir de lg, onde a navbar fixa cobre o
+    // início da seção. No celular ela não é renderizada, e o Hero entra logo
+    // depois do cartão de acesso.
+    <section id="inicio" className="relative overflow-hidden pt-10 pb-14 lg:pt-40 lg:pb-28">
       {/* Fundo: foto do ambiente + brilho ambiente + fade para o corpo da página */}
       <div className="absolute inset-0 -z-10">
         <Media

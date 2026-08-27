@@ -19,6 +19,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import br.rafaeros.fastrelax_api.core.crypto.CryptoService;
+import br.rafaeros.fastrelax_api.core.dto.CredentialDeliveryDTO;
+import br.rafaeros.fastrelax_api.core.security.CredentialProvisioning;
+import br.rafaeros.fastrelax_api.core.security.CredentialProvisioningService;
+import br.rafaeros.fastrelax_api.core.tenancy.CurrentTenant;
 import br.rafaeros.fastrelax_api.core.exceptions.BusinessException;
 import br.rafaeros.fastrelax_api.core.util.CpfUtils;
 import br.rafaeros.fastrelax_api.core.util.PhoneUtils;
@@ -30,6 +34,7 @@ import br.rafaeros.fastrelax_api.features.collaborators.WorkDay;
 import br.rafaeros.fastrelax_api.features.departments.Department;
 import br.rafaeros.fastrelax_api.features.departments.DepartmentRepository;
 import br.rafaeros.fastrelax_api.features.imports.dtos.ImportResultDTO;
+import br.rafaeros.fastrelax_api.features.imports.dtos.ImportedCredentialDTO;
 import br.rafaeros.fastrelax_api.features.imports.dtos.ImportRowErrorDTO;
 import lombok.RequiredArgsConstructor;
 
@@ -52,7 +57,13 @@ public class CollaboratorImportService {
     static final int COL_DEPARTMENT = 3;
     static final int COL_ALLOWED_START = 4;
     static final int COL_ALLOWED_END = 5;
-    static final int LAST_COLUMN = COL_ALLOWED_END;
+    /**
+     * Última coluna, acrescentada depois das demais de propósito: planilha antiga
+     * continua sendo aceita, só entra sem e-mail — e a pessoa recebe senha
+     * temporária em vez de convite.
+     */
+    static final int COL_EMAIL = 6;
+    static final int LAST_COLUMN = COL_EMAIL;
 
     /** Dias aplicados a todos os importados: o arquivo traz só os horários. */
     private static final Set<WorkDay> DEFAULT_WORK_DAYS =
@@ -62,6 +73,8 @@ public class CollaboratorImportService {
     private final CollaboratorRepository collaboratorRepository;
     private final CollaboratorWorkScheduleRepository scheduleRepository;
     private final CryptoService cryptoService;
+    private final CredentialProvisioningService provisioningService;
+    private final CurrentTenant currentTenant;
 
     @Transactional
     public ImportResultDTO importFrom(MultipartFile file) {
@@ -70,6 +83,9 @@ public class CollaboratorImportService {
         }
 
         List<ImportRowErrorDTO> errors = new ArrayList<>();
+        // Senhas dos criados nesta importação. Vivem só até a resposta sair: o
+        // banco guarda apenas o hash.
+        List<ImportedCredentialDTO> credentials = new ArrayList<>();
         // Cache por nome normalizado: várias linhas costumam repetir o mesmo
         // departamento, e sem isto cada uma faria a própria consulta.
         Map<String, Department> departmentCache = new HashMap<>();
@@ -98,6 +114,9 @@ public class CollaboratorImportService {
 
                 try {
                     RowOutcome outcome = processRow(row, departmentCache);
+                    if (outcome.credential() != null) {
+                        credentials.add(outcome.credential());
+                    }
                     processed++;
                     departmentsCreated += outcome.departmentCreated() ? 1 : 0;
                     collaboratorsCreated += outcome.collaboratorCreated() ? 1 : 0;
@@ -112,7 +131,7 @@ public class CollaboratorImportService {
         }
 
         return new ImportResultDTO(totalRows, processed, errors.size(), departmentsCreated,
-                collaboratorsCreated, collaboratorsUpdated, schedulesSaved, errors);
+                collaboratorsCreated, collaboratorsUpdated, schedulesSaved, errors, credentials);
     }
 
     private RowOutcome processRow(Row row, Map<String, Department> departmentCache) {
@@ -127,6 +146,9 @@ public class CollaboratorImportService {
             throw new BusinessException("Fim da janela permitida deve ser posterior ao início");
         }
 
+        // Coluna opcional: planilha antiga não tem, e a linha entra sem e-mail.
+        String email = ImportCellReader.readString(row, COL_EMAIL);
+
         // Aceita CPF formatado ("123.456.789-00") e repõe os zeros à esquerda que o
         // Excel apaga ao tratar a coluna como número.
         String cpf = CpfUtils.normalize(CpfUtils.padLeadingZeros(rawCpf.replaceAll("\\D", "")));
@@ -134,10 +156,25 @@ public class CollaboratorImportService {
         String normalizedPhone = PhoneUtils.normalize(phone);
 
         DepartmentOutcome department = resolveDepartment(departmentName, departmentCache);
-        CollaboratorOutcome collaborator = upsertCollaborator(name, cpf, normalizedPhone, department.department());
+        CollaboratorOutcome collaborator = upsertCollaborator(name, cpf, normalizedPhone, email,
+                department.department());
         int schedules = replaceWeekdaySchedules(collaborator.collaborator(), allowedStart, allowedEnd);
 
-        return new RowOutcome(department.created(), collaborator.created(), schedules);
+        return new RowOutcome(department.created(), collaborator.created(), schedules,
+                credentialOf(name, cpf, collaborator.provisioning()));
+    }
+
+    /**
+     * O CPF sai mascarado: a lista é feita para ser exibida e impressa, e o RH só
+     * precisa reconhecer de quem é a linha, não ter o documento inteiro na mão de
+     * quem passar pela mesa.
+     */
+    private ImportedCredentialDTO credentialOf(String name, String cpf, CredentialProvisioning provisioning) {
+        if (provisioning == null) {
+            return null;
+        }
+        String masked = "***." + cpf.substring(3, 6) + "." + cpf.substring(6, 9) + "-**";
+        return new ImportedCredentialDTO(name, masked, CredentialDeliveryDTO.from(provisioning));
     }
 
     /** Reaproveita o departamento existente — inclusive reativando um removido. */
@@ -148,7 +185,9 @@ public class CollaboratorImportService {
             return new DepartmentOutcome(cached, false);
         }
 
-        Department existing = departmentRepository.findByNameIncludingDeleted(departmentName.trim()).orElse(null);
+        Department existing = departmentRepository
+                .findByNameIncludingDeleted(currentTenant.companyId(), departmentName.trim())
+                .orElse(null);
         if (existing != null) {
             if (existing.getDeletedAt() != null) {
                 existing.setDeletedAt(null);
@@ -160,6 +199,7 @@ public class CollaboratorImportService {
         }
 
         Department created = new Department();
+        created.setCompany(currentTenant.reference());
         created.setName(departmentName.trim());
         created = departmentRepository.save(created);
         cache.put(key, created);
@@ -167,28 +207,72 @@ public class CollaboratorImportService {
     }
 
     /** Identidade é o CPF: mesmo CPF atualiza, CPF novo cria. */
-    private CollaboratorOutcome upsertCollaborator(String name, String cpf, String phone, Department department) {
+    private CollaboratorOutcome upsertCollaborator(String name, String cpf, String phone, String email,
+            Department department) {
         String cpfHash = cryptoService.blindIndex(cpf);
-        Collaborator existing = collaboratorRepository.findByCpfHashIncludingDeleted(cpfHash).orElse(null);
+        Collaborator existing = collaboratorRepository
+                .findByCpfHashIncludingDeleted(currentTenant.companyId(), cpfHash)
+                .orElse(null);
 
         if (existing != null) {
             existing.setName(name);
             existing.setPhoneNumber(phone);
             existing.setDepartment(department);
-            if (existing.getDeletedAt() != null) {
-                existing.setDeletedAt(null);
-                existing.setActive(true);
+            applyEmail(existing, email);
+
+            if (!existing.isDeleted()) {
+                // Atualização comum: mexer na credencial de quem já usa o app
+                // quebraria o acesso de todo mundo a cada correção de telefone.
+                return new CollaboratorOutcome(collaboratorRepository.save(existing), false, null);
             }
-            return new CollaboratorOutcome(collaboratorRepository.save(existing), false);
+
+            // Quem foi removido e voltou recebe credencial nova: a antiga já
+            // circulou fora do sistema, e o acesso dela foi encerrado uma vez.
+            existing.restore();
+            provisioningService.initialize(existing);
+            Collaborator reactivated = collaboratorRepository.save(existing);
+            return new CollaboratorOutcome(reactivated, false, provisioningService.provision(reactivated));
         }
 
         Collaborator created = new Collaborator();
+        created.setCompany(currentTenant.reference());
         created.setName(name);
         created.setCpfEncrypted(cryptoService.encrypt(cpf));
         created.setCpfHash(cpfHash);
         created.setPhoneNumber(phone);
         created.setDepartment(department);
-        return new CollaboratorOutcome(collaboratorRepository.save(created), true);
+        applyEmail(created, email);
+        provisioningService.initialize(created);
+
+        Collaborator saved = collaboratorRepository.save(created);
+        return new CollaboratorOutcome(saved, true, provisioningService.provision(saved));
+    }
+
+    /**
+     * E-mail da planilha, quando a coluna vier preenchida.
+     *
+     * <p>
+     * Conflito dentro da empresa recusa a linha em vez de sobrescrever: dois
+     * colaboradores com o mesmo endereço fariam a recuperação de senha apontar
+     * para a pessoa errada.
+     */
+    private void applyEmail(Collaborator collaborator, String email) {
+        if (email == null || email.isBlank()) {
+            // Reimportar sem a coluna não deve apagar o e-mail já cadastrado: a
+            // planilha modelo é a mesma de antes, e a ausência não é uma escolha.
+            return;
+        }
+
+        String normalized = email.trim().toLowerCase();
+        collaboratorRepository
+                .findByCompanyIdAndEmailIgnoreCaseAndIdNot(
+                        currentTenant.companyId(), normalized,
+                        collaborator.getId() == null ? -1L : collaborator.getId())
+                .ifPresent(other -> {
+                    throw new BusinessException("E-mail já cadastrado para outro colaborador");
+                });
+
+        collaborator.setEmail(normalized);
     }
 
     /**
@@ -236,12 +320,16 @@ public class CollaboratorImportService {
         return value.trim();
     }
 
-    private record RowOutcome(boolean departmentCreated, boolean collaboratorCreated, int schedulesSaved) {
+    /** @param credential nulo quando a linha só atualizou um cadastro existente */
+    private record RowOutcome(boolean departmentCreated, boolean collaboratorCreated, int schedulesSaved,
+            ImportedCredentialDTO credential) {
     }
 
     private record DepartmentOutcome(Department department, boolean created) {
     }
 
-    private record CollaboratorOutcome(Collaborator collaborator, boolean created) {
+    /** @param provisioning nulo quando o cadastro já existia e manteve a credencial */
+    private record CollaboratorOutcome(Collaborator collaborator, boolean created,
+            CredentialProvisioning provisioning) {
     }
 }

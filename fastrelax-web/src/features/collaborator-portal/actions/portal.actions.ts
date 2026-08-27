@@ -7,54 +7,127 @@ import { createSession } from "@/features/authentication/services/session.servic
 import {
   bookSession,
   cancelSession,
+  changeMyPassword,
   collaboratorSignIn,
+  defineFirstAccessPassword,
   finishSession,
   startSession,
 } from "@/features/collaborator-portal/services/portal.service";
+import { validateNewPassword } from "@/features/authentication/lib/password";
+import type { PasswordFormState } from "@/features/authentication/types/auth.types";
 import type {
+  CollaboratorLoginFieldErrors,
   CollaboratorLoginFormState,
   PortalActionResult,
 } from "@/features/collaborator-portal/types/portal.types";
 
 const HOME = "/colaborador";
 const AGENDA = "/colaborador/agenda";
+const DEFINE_PASSWORD = "/colaborador/definir-senha";
 
 /**
- * Login por CPF. O CPF é a credencial inteira — não há senha, por decisão de
- * produto (rede interna, dado de baixo risco).
+ * Login do colaborador: CNPJ da empresa, CPF e senha.
+ *
+ * O CPF identifica, a senha autentica. O CNPJ entra porque o CPF só é único
+ * dentro da empresa — a mesma pessoa pode ser colaboradora de dois clientes.
  */
 export async function collaboratorLoginAction(
   _previousState: CollaboratorLoginFormState,
   formData: FormData,
 ): Promise<CollaboratorLoginFormState> {
-  // A máscara é da interface; a API espera só dígitos.
-  const cpf = onlyDigits(String(formData.get("cpf") ?? ""));
+  // A máscara é da interface; a API espera só dígitos. Os valores originais
+  // voltam no estado de erro para o formulário não perder o que foi digitado —
+  // a senha fica de fora, e é o único campo que a pessoa refaz.
+  const typedCnpj = String(formData.get("cnpj") ?? "");
+  const typedCpf = String(formData.get("cpf") ?? "");
+  const cnpj = onlyDigits(typedCnpj);
+  const cpf = onlyDigits(typedCpf);
+  const password = String(formData.get("password") ?? "");
 
-  if (cpf.length !== 11) {
-    return {
-      status: "error",
-      message: "Confira o campo destacado.",
-      fieldErrors: { cpf: "Informe os 11 dígitos do CPF." },
-    };
+  const typed = { cnpj: typedCnpj, cpf: typedCpf };
+
+  const fieldErrors: CollaboratorLoginFieldErrors = {};
+  if (cnpj.length !== 14) fieldErrors.cnpj = "Informe os 14 dígitos do CNPJ.";
+  if (cpf.length !== 11) fieldErrors.cpf = "Informe os 11 dígitos do CPF.";
+  if (!password) fieldErrors.password = "Informe sua senha.";
+
+  if (Object.keys(fieldErrors).length > 0) {
+    return { status: "error", message: "Confira os campos destacados.", fieldErrors, ...typed };
   }
 
-  const result = await collaboratorSignIn(cpf);
+  const result = await collaboratorSignIn({ cnpj, cpf, password });
 
   if (!result.ok) {
-    // Mensagens do backend são acionáveis ("acesso desativado", "não
-    // encontrado") e chegam prontas para exibição.
-    return { status: "error", message: result.message, fieldErrors: { cpf: result.message } };
+    // A API responde a mesma mensagem para empresa inexistente, CPF que não
+    // está lá, senha errada e acesso desativado — de propósito, para não deixar
+    // mapear quem é cliente. Por isso o erro é geral, e não de um campo só.
+    return { status: "error", message: result.message, ...typed };
   }
 
   await createSession({
     token: result.data.token,
     refreshToken: result.data.refreshToken,
     expiresInSeconds: result.data.expiresInSeconds,
-    mustChangePassword: false,
+    mustChangePassword: result.data.mustChangePassword,
   });
 
   revalidatePath("/", "layout");
+
+  // Com senha temporária o backend bloqueia o resto da API: mandar para a home
+  // só renderizaria uma tela de erro.
+  redirect(result.data.mustChangePassword ? DEFINE_PASSWORD : HOME);
+}
+
+/** Primeiro acesso: troca a senha temporária entregue pelo RH. */
+export async function collaboratorFirstAccessPasswordAction(
+  _previousState: PasswordFormState,
+  formData: FormData,
+): Promise<PasswordFormState> {
+  const newPassword = String(formData.get("newPassword") ?? "");
+  const confirmNewPassword = String(formData.get("confirmNewPassword") ?? "");
+
+  const fieldErrors = validateNewPassword(newPassword, confirmNewPassword);
+  if (fieldErrors) {
+    return { status: "error", message: "Confira os campos destacados.", fieldErrors };
+  }
+
+  const result = await defineFirstAccessPassword(newPassword, confirmNewPassword);
+
+  if (!result.ok) {
+    return { status: "error", message: result.message };
+  }
+
+  // O layout do app volta a liberar as demais telas assim que o perfil for
+  // relido sem `mustChangePassword`.
+  revalidatePath("/", "layout");
   redirect(HOME);
+}
+
+/** Troca da própria senha, conferindo a atual. */
+export async function collaboratorChangePasswordAction(
+  _previousState: PasswordFormState,
+  formData: FormData,
+): Promise<PasswordFormState> {
+  const currentPassword = String(formData.get("currentPassword") ?? "");
+  const newPassword = String(formData.get("newPassword") ?? "");
+  const confirmNewPassword = String(formData.get("confirmNewPassword") ?? "");
+
+  const fieldErrors = validateNewPassword(newPassword, confirmNewPassword) ?? {};
+  if (!currentPassword) fieldErrors.currentPassword = "Informe sua senha atual.";
+
+  if (Object.keys(fieldErrors).length > 0) {
+    return { status: "error", message: "Confira os campos destacados.", fieldErrors };
+  }
+
+  const result = await changeMyPassword(currentPassword, newPassword, confirmNewPassword);
+
+  if (!result.ok) {
+    return { status: "error", message: result.message };
+  }
+
+  // A troca derruba as sessões abertas no backend, inclusive esta: o cookie
+  // atual ainda vale até expirar, mas o refresh já não renova.
+  return { status: "success", message: result.message };
 }
 
 /** Agenda a sessão no horário escolhido na grade. */

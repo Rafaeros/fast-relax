@@ -2,11 +2,10 @@ package br.rafaeros.fastrelax_api.features.notifications;
 
 import java.util.List;
 
-import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import br.rafaeros.fastrelax_api.core.security.Principals;
 import br.rafaeros.fastrelax_api.features.collaborators.Collaborator;
 import br.rafaeros.fastrelax_api.features.notifications.dtos.DeviceTokenResponseDTO;
 import br.rafaeros.fastrelax_api.features.notifications.dtos.RegisterDeviceTokenDTO;
@@ -33,8 +32,14 @@ public class DeviceTokenService {
         // Cada tecnologia tem sua identidade: FCM identifica pelo token, Web Push
         // pelo endpoint da inscrição. Procurar pela chave certa é o que faz o
         // registro repetido atualizar a linha em vez de duplicá-la.
-        DeviceToken deviceToken = findExisting(dto).orElseGet(() -> new DeviceToken());
+        DeviceToken deviceToken = findExisting(dto)
+                .map(existing -> reuseOrReplace(existing, collaborator))
+                .orElseGet(DeviceToken::new);
 
+        if (deviceToken.getCompany() == null) {
+            // A empresa vem do colaborador, não do contexto — é dele que o aparelho é.
+            deviceToken.setCompany(collaborator.getCompany());
+        }
         deviceToken.setToken(dto.token());
         deviceToken.setPushSubscription(dto.pushSubscription());
         deviceToken.setPlatform(dto.platform());
@@ -42,6 +47,26 @@ public class DeviceTokenService {
         deviceToken.setActive(true);
 
         return new DeviceTokenResponseDTO(deviceTokenRepository.save(deviceToken));
+    }
+
+    /**
+     * Aparelho que mudou de dono.
+     *
+     * <p>
+     * Dentro da mesma empresa basta trocar o colaborador na linha existente. Se o
+     * dono novo é de outra empresa, a linha não pode ser reaproveitada: o
+     * {@code company_id} é imutável de propósito, para que nenhum registro mude de
+     * tenant por acidente. A linha antiga é apagada — o aparelho não é mais
+     * daquela pessoa, e o índice único do token não admite duas — e o registro
+     * nasce de novo no tenant certo.
+     */
+    private DeviceToken reuseOrReplace(DeviceToken existing, Collaborator collaborator) {
+        if (java.util.Objects.equals(existing.companyId(), collaborator.companyId())) {
+            return existing;
+        }
+        deviceTokenRepository.delete(existing);
+        deviceTokenRepository.flush();
+        return new DeviceToken();
     }
 
     private java.util.Optional<DeviceToken> findExisting(RegisterDeviceTokenDTO dto) {
@@ -83,10 +108,6 @@ public class DeviceTokenService {
     }
 
     private Collaborator requireLoggedCollaborator() {
-        var authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !(authentication.getPrincipal() instanceof Collaborator logged)) {
-            throw new AccessDeniedException("Rota disponível apenas para colaboradores autenticados");
-        }
-        return logged;
+        return Principals.requireCollaborator();
     }
 }

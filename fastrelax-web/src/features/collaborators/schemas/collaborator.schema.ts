@@ -5,6 +5,8 @@ import type {
 } from "@/features/collaborators/types/collaborator.types";
 import { WORK_DAYS, type AllowedWindow } from "@/features/collaborators/types/schedule.types";
 
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
 export type CollaboratorFieldErrors = Partial<
   Record<keyof CreateCollaboratorInput | "allowedWindows", string>
 >;
@@ -40,13 +42,21 @@ export function validateCollaboratorInput(input: {
   name: string;
   cpf: string;
   phoneNumber: string;
+  email: string;
   departmentId: string;
 }): CollaboratorValidation {
   const name = input.name.trim();
   const cpf = onlyDigits(input.cpf);
   const phoneNumber = onlyDigits(input.phoneNumber);
+  const email = input.email.trim().toLowerCase();
   const departmentId = Number(input.departmentId);
   const fieldErrors: CollaboratorFieldErrors = {};
+
+  // Campo opcional: só é validado quando preenchido. Vazio significa "sem
+  // e-mail", e a pessoa recebe senha temporária em vez de convite.
+  if (email && !EMAIL_PATTERN.test(email)) {
+    fieldErrors.email = "E-mail inválido.";
+  }
 
   if (name.length < 2 || name.length > 120) {
     fieldErrors.name = "O nome deve ter entre 2 e 120 caracteres.";
@@ -74,7 +84,7 @@ export function validateCollaboratorInput(input: {
     return { valid: false, fieldErrors };
   }
 
-  return { valid: true, data: { name, cpf, phoneNumber, departmentId } };
+  return { valid: true, data: { name, cpf, phoneNumber, email: email || undefined, departmentId } };
 }
 
 export type UpdateValidation =
@@ -89,14 +99,20 @@ export function validateCollaboratorUpdateInput(input: {
   name: string;
   cpf: string;
   phoneNumber: string;
+  email: string;
   departmentId: string;
   active: string;
 }): UpdateValidation {
   const name = input.name.trim();
   const cpf = onlyDigits(input.cpf);
   const phoneNumber = onlyDigits(input.phoneNumber);
+  const email = input.email.trim().toLowerCase();
   const departmentId = Number(input.departmentId);
   const fieldErrors: CollaboratorFieldErrors = {};
+
+  if (email && !EMAIL_PATTERN.test(email)) {
+    fieldErrors.email = "E-mail inválido.";
+  }
 
   if (name.length < 2 || name.length > 120) {
     fieldErrors.name = "O nome deve ter entre 2 e 120 caracteres.";
@@ -124,7 +140,8 @@ export function validateCollaboratorUpdateInput(input: {
 
   return {
     valid: true,
-    data: { name, cpf, phoneNumber, departmentId, active: input.active === "true" },
+    // String vazia viaja de propósito: é assim que a edição remove o e-mail.
+    data: { name, cpf, phoneNumber, email, departmentId, active: input.active === "true" },
   };
 }
 

@@ -5,13 +5,15 @@ import { buildQuery } from "@/lib/api/query";
 import { readAccessToken } from "@/features/authentication/services/session.service";
 import type {
   Chair,
+  ChairNetworkResult,
   ListChairsParams,
   SaveChairInput,
 } from "@/features/chairs/types/chair.types";
 
 /**
  * Acesso à API de cadeiras (`/chairs`).
- * Todas as rotas exigem ADMIN ou RH — o token sai do cookie httpOnly, então
+ * Leitura vale para a equipe da plataforma e para quem opera a empresa; a
+ * configuração de rede é só da plataforma. O token sai do cookie httpOnly, então
  * estas funções só rodam no servidor.
  *
  * O heartbeat (`POST /chairs/heartbeat`) não aparece aqui: quem chama é o
@@ -93,6 +95,31 @@ export async function testChairRelay(
 export async function deleteChair(id: number): Promise<ApiResult<null>> {
   return apiFetch<null>(`${RESOURCE}/${id}`, {
     method: "DELETE",
+    token: await readAccessToken(),
+  });
+}
+
+/**
+ * Grava a rede da empresa na memória do ESP32.
+ *
+ * <p>
+ * Exclusivo da equipe da plataforma no backend. A senha não passa por aqui: ela
+ * sai cifrada do cadastro da empresa e é decifrada só no instante do envio ao
+ * dispositivo.
+ */
+export async function pushChairNetwork(id: number): Promise<ApiResult<ChairNetworkResult>> {
+  return apiFetch<ChairNetworkResult>(`${RESOURCE}/${id}/network`, {
+    method: "POST",
+    token: await readAccessToken(),
+  });
+}
+
+/** Reenvia para todas as cadeiras ativas de uma empresa — o gesto pós-troca de senha. */
+export async function pushCompanyNetwork(
+  companyId: number,
+): Promise<ApiResult<ChairNetworkResult[]>> {
+  return apiFetch<ChairNetworkResult[]>(`${RESOURCE}/network/company/${companyId}`, {
+    method: "POST",
     token: await readAccessToken(),
   });
 }

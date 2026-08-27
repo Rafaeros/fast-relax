@@ -12,6 +12,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import br.rafaeros.fastrelax_api.core.exceptions.BusinessException;
+import br.rafaeros.fastrelax_api.core.tenancy.CurrentTenant;
+import br.rafaeros.fastrelax_api.core.tenancy.TenantSpecifications;
 import br.rafaeros.fastrelax_api.features.collaborators.Collaborator;
 import br.rafaeros.fastrelax_api.features.collaborators.CollaboratorRepository;
 import br.rafaeros.fastrelax_api.features.collaborators.CollaboratorSession;
@@ -40,6 +42,7 @@ public class DashboardService {
     private final CollaboratorSessionRepository sessionRepository;
     private final CollaboratorRepository collaboratorRepository;
     private final CollaboratorWorkScheduleRepository scheduleRepository;
+    private final CurrentTenant currentTenant;
 
     /**
      * @param from início do período; ausente assume os últimos 30 dias
@@ -56,7 +59,7 @@ public class DashboardService {
             throw new BusinessException("O período máximo de consulta é de " + MAX_RANGE_DAYS + " dias");
         }
 
-        List<CollaboratorSession> sessions = sessionRepository.findBySessionDateBetween(start, end);
+        List<CollaboratorSession> sessions = sessionRepository.findByCompanyIdAndSessionDateBetween(currentTenant.companyId(), start, end);
 
         Map<SessionStatus, Long> byStatus = new EnumMap<>(SessionStatus.class);
         for (CollaboratorSession session : sessions) {
@@ -89,21 +92,22 @@ public class DashboardService {
     }
 
     private long countActiveCollaborators() {
-        return collaboratorRepository.findAll().stream()
+        return collaboratorRepository.findAllScoped(null).stream()
                 .filter(collaborator -> collaborator.isActive())
                 .count();
     }
 
     /** Colaborador sem horário permitido configurado nunca consegue agendar — o RH precisa ver isso. */
     private long countCollaboratorsWithoutSchedule() {
-        List<Long> withSchedule = scheduleRepository.findAll().stream()
+        List<Long> withSchedule = scheduleRepository.findAll(
+                TenantSpecifications.<CollaboratorWorkSchedule>currentCompany("collaborator", "company")).stream()
                 .filter(schedule -> schedule.isActive())
                 .map(schedule -> schedule.getCollaborator() != null ? schedule.getCollaborator().getId() : null)
                 .filter(id -> id != null)
                 .distinct()
                 .toList();
 
-        return collaboratorRepository.findAll().stream()
+        return collaboratorRepository.findAllScoped(null).stream()
                 .filter(collaborator -> collaborator.isActive())
                 .filter(collaborator -> !withSchedule.contains(collaborator.getId()))
                 .count();

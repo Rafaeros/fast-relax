@@ -22,5 +22,21 @@ public record SaveChairRequestDTO(
 
     @Min(value = 1, message = "Porta inválida")
     @Max(value = 65535, message = "Porta inválida")
-    Integer port
+    Integer port,
+
+    /** Versão instalada no dispositivo. Opcional: nem toda cadeira passou pela atualização formal. */
+    Long firmwareId,
+
+    /**
+     * Ponto de acesso em que esta cadeira deve entrar, dentro do SSID da
+     * empresa. Em branco deixa o ESP32 escolher o de melhor sinal.
+     *
+     * <p>
+     * Fixar importa em planta com vários APs no mesmo nome de rede: sem isso a
+     * cadeira pode grudar num ponto distante e ficar com sinal ruim tendo um AP
+     * a três metros.
+     */
+    @Pattern(regexp = "^(|([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2})$",
+            message = "BSSID inválido. Use o formato AA:BB:CC:DD:EE:FF")
+    String wifiBssid
 ) {}

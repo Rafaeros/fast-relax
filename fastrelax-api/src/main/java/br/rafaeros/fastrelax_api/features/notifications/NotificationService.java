@@ -7,11 +7,11 @@ import java.util.Objects;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import br.rafaeros.fastrelax_api.core.exceptions.ResourceNotFoundException;
+import br.rafaeros.fastrelax_api.core.security.Principals;
 import br.rafaeros.fastrelax_api.features.collaborators.Collaborator;
 import br.rafaeros.fastrelax_api.features.collaborators.CollaboratorRepository;
 import br.rafaeros.fastrelax_api.features.notifications.dtos.NotificationResponseDTO;
@@ -54,6 +54,9 @@ public class NotificationService {
                 .orElseThrow(() -> new ResourceNotFoundException("Colaborador não encontrado"));
 
         Notification notification = new Notification();
+        // A empresa vem do colaborador: este metodo tambem e chamado pelos jobs, que
+        // rodam sem tenant no contexto e nao teriam de onde tirar o dono do aviso.
+        notification.setCompany(collaborator.getCompany());
         notification.setCollaborator(collaborator);
         notification.setType(type);
         notification.setTitle(title);
@@ -86,7 +89,9 @@ public class NotificationService {
     public NotificationResponseDTO markAsRead(Long id) {
         Long collaboratorId = requireLoggedCollaboratorId();
 
-        Notification notification = notificationRepository.findById(Objects.requireNonNull(id))
+        // Escopada: um id de outra empresa nem chega à checagem de dono, responde
+        // 404 como se não existisse.
+        Notification notification = notificationRepository.findByIdScoped(Objects.requireNonNull(id))
                 .orElseThrow(() -> new ResourceNotFoundException("Notificação não encontrada"));
 
         if (!notification.getCollaborator().getId().equals(collaboratorId)) {
@@ -110,10 +115,6 @@ public class NotificationService {
     }
 
     private Long requireLoggedCollaboratorId() {
-        var authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !(authentication.getPrincipal() instanceof Collaborator logged)) {
-            throw new AccessDeniedException("Rota disponível apenas para colaboradores autenticados");
-        }
-        return logged.getId();
+        return Principals.requireCollaborator().getId();
     }
 }

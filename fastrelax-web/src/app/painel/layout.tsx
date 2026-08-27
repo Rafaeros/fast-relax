@@ -4,7 +4,9 @@ import { Badge, Logo } from "@/components/ui";
 import { PanelBreadcrumb } from "@/components/layout/PanelBreadcrumb";
 import { PanelSidebar } from "@/components/layout/PanelSidebar";
 import { PanelTabBar } from "@/components/layout/PanelTabBar";
+import { panelHomeFor, panelNavFor } from "@/config/navigation";
 import { LogoutButton } from "@/features/authentication/components/LogoutButton";
+import { ROLE_SHORT_LABELS } from "@/features/authentication/lib/roles";
 import { getCurrentUser } from "@/features/authentication/services/auth.service";
 
 /**
@@ -24,9 +26,18 @@ export default async function PainelLayout({ children }: { children: ReactNode }
   const user = await getCurrentUser();
   if (!user) redirect("/entrar");
 
+  // Com senha temporária o backend bloqueia todo o resto da API: qualquer tela
+  // daqui renderizaria erro, então o caminho é um só.
+  if (user.mustChangePassword) redirect("/definir-senha");
+
+  // A navegação depende do papel: a equipe da Physical administra empresas e
+  // firmwares, os papéis de cliente operam a própria empresa.
+  const navItems = panelNavFor(user);
+  const homeHref = panelHomeFor(user);
+
   return (
     <div className="flex h-dvh flex-col overflow-hidden lg:flex-row">
-      <PanelSidebar />
+      <PanelSidebar items={navItems} homeHref={homeHref} />
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <header
@@ -44,9 +55,19 @@ export default async function PainelLayout({ children }: { children: ReactNode }
 
             <div className="flex shrink-0 items-center gap-2 sm:gap-3">
               <Badge tone="neutral" className="hidden sm:inline-flex">
-                {user.role === "ADMIN" ? "Admin" : "RH"}
+                {ROLE_SHORT_LABELS[user.role]}
               </Badge>
-              <span className="hidden text-sm text-ink-secondary lg:inline">{user.name}</span>
+              {/*
+                A empresa aparece ao lado do nome porque o mesmo painel agora
+                atende clientes diferentes — sem isso não há como saber, olhando
+                a tela, em qual deles se está operando.
+              */}
+              <span className="hidden min-w-0 flex-col text-right lg:flex">
+                <span className="truncate text-sm text-ink-secondary">{user.name}</span>
+                {user.companyName && (
+                  <span className="truncate text-xs text-ink-tertiary">{user.companyName}</span>
+                )}
+              </span>
               <LogoutButton />
             </div>
           </div>
@@ -62,7 +83,7 @@ export default async function PainelLayout({ children }: { children: ReactNode }
         </main>
       </div>
 
-      <PanelTabBar />
+      <PanelTabBar items={navItems} homeHref={homeHref} />
     </div>
   );
 }

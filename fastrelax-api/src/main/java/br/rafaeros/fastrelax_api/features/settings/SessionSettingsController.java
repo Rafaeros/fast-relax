@@ -33,8 +33,8 @@ public class SessionSettingsController {
     }
 
     @PutMapping
-    @PreAuthorize("@collaboratorSecurity.hasAdminOrRhAccess()")
-    @Operation(summary = "Altera as configurações globais das sessões")
+    @PreAuthorize("@access.operatesCompany()")
+    @Operation(summary = "Altera as configurações de sessão da empresa")
     public ResponseEntity<ApiResponseDTO<SessionSettingsResponseDTO>> update(
             @RequestBody @Valid UpdateSessionSettingsRequestDTO dto) {
         return ResponseEntity.ok(ApiResponseDTO.success(settingsService.update(dto),

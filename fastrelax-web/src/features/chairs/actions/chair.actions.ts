@@ -6,12 +6,19 @@ import {
   createChair,
   deleteChair,
   listChairs,
+  pushChairNetwork,
+  pushCompanyNetwork,
   testChairRelay,
   toggleChairActive,
   updateChair,
 } from "@/features/chairs/services/chair.service";
 import { mapChairApiErrors, validateChairInput } from "@/features/chairs/schemas/chair.schema";
-import type { Chair, ChairFilter, ChairFormState } from "@/features/chairs/types/chair.types";
+import type {
+  Chair,
+  ChairFilter,
+  ChairFormState,
+  ChairNetworkResult,
+} from "@/features/chairs/types/chair.types";
 import type { MutationResult } from "@/features/collaborators/types/collaborator.types";
 
 const ROUTE = "/painel/cadeiras";
@@ -41,6 +48,8 @@ function readFormFields(formData: FormData) {
     macAddress: String(formData.get("macAddress") ?? ""),
     ipAddress: String(formData.get("ipAddress") ?? ""),
     port: String(formData.get("port") ?? ""),
+    firmwareId: String(formData.get("firmwareId") ?? ""),
+    wifiBssid: String(formData.get("wifiBssid") ?? ""),
   };
 }
 
@@ -146,4 +155,39 @@ export async function deleteChairAction(id: number): Promise<MutationResult> {
   if (result.ok) revalidatePath(ROUTE);
 
   return { ok: result.ok, message: result.message };
+}
+
+/**
+ * Grava a rede da empresa na memória do ESP32.
+ *
+ * <p>
+ * Só a equipe da plataforma alcança — é ela que instala o equipamento e conhece
+ * a rede do cliente.
+ */
+export async function pushChairNetworkAction(id: number): Promise<MutationResult> {
+  const result = await pushChairNetwork(id);
+  if (result.ok) revalidatePath(ROUTE);
+
+  return { ok: result.ok, message: result.message };
+}
+
+/**
+ * Reenvia para todas as cadeiras ativas de uma empresa.
+ *
+ * <p>
+ * O gesto de depois de trocar a senha do Wi-Fi. Devolve a lista para a tela
+ * mostrar quais receberam e quais faltaram — uma cadeira esquecida some da rede
+ * sem ninguém perceber até alguém tentar agendar.
+ */
+export async function pushCompanyNetworkAction(
+  companyId: number,
+): Promise<MutationResult & { results: ChairNetworkResult[] }> {
+  const result = await pushCompanyNetwork(companyId);
+  if (result.ok) revalidatePath(ROUTE);
+
+  return {
+    ok: result.ok,
+    message: result.message,
+    results: result.ok ? result.data : [],
+  };
 }

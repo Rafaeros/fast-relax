@@ -3,6 +3,8 @@ import type { DetailItem } from "@/components/ui";
 import { formatCpf, formatPhone } from "@/lib/format";
 import { formatTimeRange } from "@/features/collaborator-portal/lib/format";
 import { PushToggle } from "@/features/notifications/components/PushToggle";
+import { PasswordSetupForm } from "@/features/authentication/components/PasswordSetupForm";
+import { collaboratorChangePasswordAction } from "@/features/collaborator-portal/actions/portal.actions";
 import type {
   AllowedWindow,
   CollaboratorProfile,
@@ -19,6 +21,8 @@ export function ProfileView({ profile, windows }: ProfileViewProps) {
     { label: "Nome", value: profile.name, full: true },
     { label: "CPF", value: formatCpf(profile.cpf) },
     { label: "Telefone", value: formatPhone(profile.phoneNumber) },
+    // Sem e-mail não há "esqueci minha senha": a recuperação depende dele.
+    { label: "E-mail", value: profile.email ?? "Não cadastrado" },
     { label: "Departamento", value: profile.departmentName ?? "—" },
     {
       label: "Situação",
@@ -53,6 +57,21 @@ export function ProfileView({ profile, windows }: ProfileViewProps) {
       {/* Fica no perfil porque a inscrição é deste navegador, não da conta: é
           uma preferência do aparelho, ao lado dos dados de quem está logado. */}
       <PushToggle />
+
+      {/* A senha passou a existir com o multi-tenant: o CPF virou identificador,
+          não credencial, e trocar a senha precisa ter um lugar no app. */}
+      <Card padding="none" className="flex flex-col">
+        <div className="flex flex-col gap-1 border-b border-line p-4">
+          <h2 className="text-sm font-semibold text-ink-primary">Trocar senha</h2>
+          <p className="text-xs text-ink-tertiary">
+            Ao trocar, os outros aparelhos precisam entrar de novo.
+          </p>
+        </div>
+
+        <div className="p-4">
+          <PasswordSetupForm mode="change" action={collaboratorChangePasswordAction} />
+        </div>
+      </Card>
 
       <Card padding="none" className="flex flex-col">
         <div className="flex flex-col gap-1 border-b border-line p-4">

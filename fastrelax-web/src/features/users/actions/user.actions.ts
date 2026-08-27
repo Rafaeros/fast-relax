@@ -48,6 +48,7 @@ export async function createUserAction(
     name: String(formData.get("name") ?? ""),
     email: String(formData.get("email") ?? ""),
     role: String(formData.get("role") ?? ""),
+    companyId: String(formData.get("companyId") ?? ""),
   });
 
   if (!validation.valid) {
@@ -74,7 +75,7 @@ export async function createUserAction(
   return {
     status: "success",
     message: result.message,
-    temporaryPassword: result.data.temporaryPassword,
+    credential: result.data.credential,
   };
 }
 

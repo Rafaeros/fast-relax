@@ -8,6 +8,7 @@ import {
   DEPARTMENT_INITIAL_STATE,
   type Department,
 } from "@/features/departments/types/department.types";
+import { hasFieldErrors } from "@/lib/forms";
 
 export type EditDepartmentModalProps = {
   /** `null` mantém o modal fechado — o pai guarda a linha selecionada. */
@@ -50,7 +51,7 @@ export function EditDepartmentModal({
 
       // Erro de campo fica no formulário, ao lado do input a corrigir. O recado
       // geral do servidor vai para o toast, que não depende do modal aberto.
-      if (result.message && !result.fieldErrors) toast.error(result.message);
+      if (result.message && !hasFieldErrors(result.fieldErrors)) toast.error(result.message);
       setState(result);
     });
   };

@@ -165,6 +165,57 @@ function ImportSummary({ result }: { result: ImportResult }) {
         ))}
       </div>
 
+      {/*
+        As senhas aparecem uma única vez: o banco guarda só o hash. Sem esta
+        lista, os colaboradores importados ficariam cadastrados e sem como
+        entrar — cada um dependeria de uma redefinição individual.
+      */}
+      {result.credentials.length > 0 && (
+        <div className="flex flex-col gap-2">
+          {/* O aviso só aparece se houver senha na lista: quem recebeu convite
+              não precisa que ninguém repasse nada. */}
+          {result.credentials.some((entry) => entry.delivery.kind === "TEMPORARY_PASSWORD") && (
+            <Alert tone="warning" title="Senhas exibidas uma única vez">
+              Repasse antes de fechar. Depois disso, resta redefinir uma a uma.
+            </Alert>
+          )}
+
+          <div className="max-h-56 overflow-auto rounded-control border border-line">
+            <table className="w-full text-left text-xs">
+              <thead className="sticky top-0 bg-surface-card text-ink-muted">
+                <tr>
+                  <th className="px-3 py-2 font-semibold">Colaborador</th>
+                  <th className="px-3 py-2 font-semibold">CPF</th>
+                  <th className="px-3 py-2 font-semibold">Acesso</th>
+                </tr>
+              </thead>
+              <tbody>
+                {result.credentials.map((credential) => (
+                  <tr
+                    key={`${credential.cpf}-${credential.name}`}
+                    className="border-t border-line-soft/60 text-ink-secondary"
+                  >
+                    <td className="px-3 py-2">{credential.name}</td>
+                    <td className="px-3 py-2 tabular-nums">{credential.cpf}</td>
+                    <td className="px-3 py-2">
+                      {credential.delivery.kind === "INVITE_SENT" ? (
+                        <span className="text-ink-tertiary">
+                          Convite enviado para {credential.delivery.email}
+                        </span>
+                      ) : (
+                        <span className="font-mono text-ink-primary">
+                          {credential.delivery.temporaryPassword}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {result.errors.length > 0 && (
         <div className="flex flex-col gap-2">
           <span className="text-xs font-semibold tracking-wide text-ink-secondary">

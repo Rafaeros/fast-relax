@@ -16,7 +16,7 @@ const AREAS: Area[] = [
     eyebrow: "Colaborador",
     title: "Agende sua massagem",
     description:
-      "Entre com o CPF, escolha um horário livre dentro da sua janela e acompanhe suas sessões.",
+      "Entre com o CNPJ da empresa, seu CPF e sua senha, escolha um horário livre dentro da sua janela e acompanhe suas sessões.",
     href: "/colaborador/entrar" as Route,
     cta: "Área do colaborador",
     icon: "users",

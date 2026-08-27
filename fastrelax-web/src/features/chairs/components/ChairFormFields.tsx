@@ -1,13 +1,20 @@
 "use client";
 
-import { Icon, Input } from "@/components/ui";
-import type { Chair, ChairFieldErrors } from "@/features/chairs/types/chair.types";
+import { Icon, Input, Select } from "@/components/ui";
+import type {
+  Chair,
+  ChairFieldErrors,
+  FirmwareOption,
+} from "@/features/chairs/types/chair.types";
+
 
 export type ChairFormFieldsProps = {
   fieldErrors: ChairFieldErrors;
   disabled?: boolean;
   /** Registro em edição — ausente no cadastro. */
   chair?: Chair;
+  /** Versões do catálogo da Physical, para registrar o que está gravado. */
+  firmwares?: FirmwareOption[];
 };
 
 /**
@@ -16,7 +23,12 @@ export type ChairFormFieldsProps = {
  * O MAC é a identidade do dispositivo; IP e porta são apenas endereço e ficam
  * opcionais porque o heartbeat do ESP32 os preenche sozinho.
  */
-export function ChairFormFields({ fieldErrors, disabled, chair }: ChairFormFieldsProps) {
+export function ChairFormFields({
+  fieldErrors,
+  disabled,
+  chair,
+  firmwares = [],
+}: ChairFormFieldsProps) {
   return (
     <>
       <Input
@@ -72,6 +84,45 @@ export function ChairFormFields({ fieldErrors, disabled, chair }: ChairFormField
           error={fieldErrors.port}
         />
       </div>
+
+      {/*
+        A versão é informativa: quem grava o firmware é a Physical, pela porta
+        do dispositivo. Registrar aqui é o que permite ao suporte saber o que
+        está em campo sem ir até a cadeira.
+      */}
+      {/*
+        Fixar o AP importa em planta com vários pontos no mesmo SSID: sem isso a
+        cadeira pode grudar num ponto distante e ficar com sinal ruim tendo um
+        AP a três metros. Em branco, o ESP32 escolhe o de melhor sinal.
+      */}
+      <Input
+        name="wifiBssid"
+        label="BSSID do ponto de acesso"
+        placeholder="AA:BB:CC:DD:EE:FF"
+        autoComplete="off"
+        maxLength={17}
+        disabled={disabled}
+        defaultValue={chair?.wifiBssid ?? ""}
+        hint="Opcional — em branco, a cadeira escolhe o AP de melhor sinal."
+        error={fieldErrors.wifiBssid}
+        leadingIcon={<Icon name="wrench" />}
+      />
+
+      <Select
+        name="firmwareId"
+        label="Firmware instalado"
+        defaultValue={chair?.firmwareId ? String(chair.firmwareId) : ""}
+        disabled={disabled}
+        error={fieldErrors.firmwareId}
+        hint="Opcional — deixe em branco se a versão não for conhecida."
+        options={[
+          { label: "Não informado", value: "" },
+          ...firmwares.map((firmware) => ({
+            label: ` — `,
+            value: String(firmware.id),
+          })),
+        ]}
+      />
     </>
   );
 }

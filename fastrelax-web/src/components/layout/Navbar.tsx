@@ -27,6 +27,9 @@ export function Navbar() {
   return (
     <header
       className={cn(
+        // Some no celular: ali a primeira tela é o MobileAccessCard, e uma
+        // barra fixa só custaria altura para esconder o menu num hambúrguer.
+        "hidden lg:block",
         "fixed inset-x-0 top-0 z-50 transition-colors duration-300",
         scrolled || menuOpen
           ? "border-b border-line/70 bg-surface-base/85 backdrop-blur-lg"

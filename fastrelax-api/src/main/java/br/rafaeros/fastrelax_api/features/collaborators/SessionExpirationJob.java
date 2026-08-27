@@ -19,11 +19,11 @@ public class SessionExpirationJob {
 
     private static final Logger log = LoggerFactory.getLogger(SessionExpirationJob.class);
 
-    private final SessionExpirationService sessionExpirationService;
+    private final SessionExpirationSweeper sweeper;
 
     @Scheduled(fixedDelayString = "${app.sessions.expiration-interval-ms:30000}")
     public void expireAbandonedSessions() {
-        int expired = sessionExpirationService.expireAbandonedSessions();
+        int expired = sweeper.sweepAllCompanies();
         if (expired > 0) {
             log.info("Sessões expiradas automaticamente: {}", expired);
         }

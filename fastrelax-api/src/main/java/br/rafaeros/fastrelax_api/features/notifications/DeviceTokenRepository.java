@@ -3,12 +3,18 @@ package br.rafaeros.fastrelax_api.features.notifications;
 import java.util.List;
 import java.util.Optional;
 
-import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface DeviceTokenRepository extends JpaRepository<DeviceToken, Long> {
+import br.rafaeros.fastrelax_api.core.tenancy.CompanyScopedRepository;
 
+public interface DeviceTokenRepository extends CompanyScopedRepository<DeviceToken> {
+
+    /**
+     * O token do FCM é único no sistema inteiro: o mesmo aparelho não pode estar
+     * registrado em duas empresas. Por isso a busca não filtra por empresa —
+     * reinscrever precisa encontrar a linha existente onde quer que ela esteja.
+     */
     Optional<DeviceToken> findByToken(String token);
 
     List<DeviceToken> findByCollaboratorIdAndActiveTrue(Long collaboratorId);

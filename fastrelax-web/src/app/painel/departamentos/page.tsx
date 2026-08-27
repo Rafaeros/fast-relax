@@ -5,12 +5,15 @@ import { fetchDepartmentsPage } from "@/features/departments/actions/department.
 import { DepartmentsTable } from "@/features/departments/components/DepartmentsTable";
 import { listDepartments } from "@/features/departments/services/department.service";
 import type { Department } from "@/features/departments/types/department.types";
+import { requireCompanyUser } from "@/features/authentication/lib/guards";
 
 export const metadata: Metadata = {
   title: "Departamentos — physical",
 };
 
 export default async function DepartamentosPage() {
+  await requireCompanyUser();
+
   // Primeira página no servidor: a tabela chega preenchida, sem piscar vazia.
   const result = await listDepartments({ page: 0 });
   const initialSlice = result.ok ? toPageSlice(result.data) : emptyPageSlice<Department>();

@@ -31,7 +31,7 @@ import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/users")
-@PreAuthorize("hasAnyRole('ADMIN', 'RH')")
+@PreAuthorize("@access.isPlatformTeam() or @access.operatesCompany()")
 @RequiredArgsConstructor
 @Tag(name = "Usuários (ADMIN/RH)")
 public class UserController {
@@ -97,7 +97,7 @@ public class UserController {
     }
 
     @PatchMapping("/{id}/password")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@access.isPlatformTeam() or @access.administersCompany()")
     @Operation(summary = "Gera nova senha temporária para outro usuário (somente ADMIN)")
     public ResponseEntity<ApiResponseDTO<TemporaryPasswordResponseDTO>> resetPassword(@PathVariable Long id) {
         String temporaryPassword = passwordResetService.resetPassword(id);
@@ -106,7 +106,7 @@ public class UserController {
     }
 
     @PatchMapping("/{id}/toggle-active")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@access.isPlatformTeam() or @access.administersCompany()")
     @Operation(summary = "Ativa ou desativa um usuário (somente ADMIN)")
     public ResponseEntity<ApiResponseDTO<UserResponseDTO>> toggleActive(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponseDTO.success(userService.toggleActive(id),
@@ -114,7 +114,7 @@ public class UserController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@access.isPlatformTeam() or @access.administersCompany()")
     @Operation(summary = "Remove um usuário (soft delete, somente ADMIN)")
     public ResponseEntity<ApiResponseDTO<Void>> delete(@PathVariable Long id) {
         userService.softDelete(id);

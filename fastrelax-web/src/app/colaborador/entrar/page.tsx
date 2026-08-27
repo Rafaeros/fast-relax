@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Card, Icon, Logo } from "@/components/ui";
+import { Alert, Card, Icon, Logo } from "@/components/ui";
 import { LoginBrandPanel } from "@/features/authentication/components/LoginBrandPanel";
 import { CollaboratorLoginForm } from "@/features/collaborator-portal/components/CollaboratorLoginForm";
 import { getCurrentCollaborator } from "@/features/collaborator-portal/services/portal.service";
@@ -18,7 +18,14 @@ const HIGHLIGHTS = [
   { icon: "heart" as const, text: "Acompanhe seu histórico de sessões" },
 ];
 
-export default async function CollaboratorLoginPage() {
+export default async function CollaboratorLoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ senha?: string }>;
+}) {
+  // Vem do redirecionamento pós-redefinição: confirma que deu certo, já que a
+  // ação não abre sessão sozinha.
+  const { senha } = await searchParams;
   // Quem já tem sessão válida não vê o formulário de novo.
   const collaborator = await getCurrentCollaborator();
   if (collaborator) redirect("/colaborador");
@@ -60,9 +67,16 @@ export default async function CollaboratorLoginPage() {
             <span className="eyebrow">Área do colaborador</span>
             <h1 className="font-display text-3xl text-ink-primary">Bem-vindo</h1>
             <p className="text-sm leading-relaxed text-ink-secondary">
-              Informe seu CPF para agendar sua massagem e acompanhar suas sessões.
+              Informe o CNPJ da empresa, seu CPF e sua senha para agendar e
+              acompanhar suas sessões.
             </p>
           </div>
+
+          {senha === "ok" && (
+            <Alert tone="success" title="Senha definida">
+              Entre com a senha que você acabou de escolher.
+            </Alert>
+          )}
 
           <Card padding="lg">
             <CollaboratorLoginForm />

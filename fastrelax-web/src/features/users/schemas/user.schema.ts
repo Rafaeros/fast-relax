@@ -6,7 +6,7 @@ import type {
 } from "@/features/users/types/user.types";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-const ROLES: UserRole[] = ["ADMIN", "RH"];
+const ROLES: UserRole[] = ["SYSADMIN", "COMPANY_ADMIN", "COMPANY_RH"];
 
 export type CreateUserValidation =
   | { valid: true; data: CreateUserInput }
@@ -17,6 +17,7 @@ export function validateCreateUserInput(input: {
   name: string;
   email: string;
   role: string;
+  companyId?: string;
 }): CreateUserValidation {
   const name = input.name.trim();
   const email = input.email.trim().toLowerCase();
@@ -43,7 +44,18 @@ export function validateCreateUserInput(input: {
     return { valid: false, fieldErrors };
   }
 
-  return { valid: true, data: { name, email, role } };
+  // Só o SYSADMIN informa a empresa; para quem opera dentro de uma, o backend
+  // ignora o campo e usa a do contexto.
+  const companyId = Number(input.companyId);
+  return {
+    valid: true,
+    data: {
+      name,
+      email,
+      role,
+      companyId: Number.isInteger(companyId) && companyId > 0 ? companyId : undefined,
+    },
+  };
 }
 
 export type UpdateUserValidation =

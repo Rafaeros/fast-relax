@@ -1,5 +1,6 @@
 package br.rafaeros.fastrelax_api.features.chairs;
 
+import java.util.List;
 import java.util.Objects;
 
 import org.springdoc.core.annotations.ParameterObject;
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 import br.rafaeros.fastrelax_api.core.dto.ApiResponseDTO;
 import br.rafaeros.fastrelax_api.features.chairs.dtos.ChairFilterDTO;
 import br.rafaeros.fastrelax_api.features.chairs.dtos.ChairHeartbeatRequestDTO;
+import br.rafaeros.fastrelax_api.features.chairs.dtos.ChairNetworkResultDTO;
 import br.rafaeros.fastrelax_api.features.chairs.dtos.ChairResponseDTO;
 import br.rafaeros.fastrelax_api.features.chairs.dtos.SaveChairRequestDTO;
 import io.swagger.v3.oas.annotations.Operation;
@@ -37,6 +39,7 @@ import lombok.RequiredArgsConstructor;
 public class ChairController {
 
     private final ChairService chairService;
+    private final ChairNetworkService networkService;
     private final ChairCommandService chairCommandService;
 
     /**
@@ -52,7 +55,10 @@ public class ChairController {
     }
 
     @GetMapping
-    @PreAuthorize("@collaboratorSecurity.hasAdminOrRhAccess()")
+    // A equipe da plataforma enxerga o parque de todos os clientes: é ela que
+    // instala e configura o equipamento. Cadeira é ativo da Physical, não dado
+    // pessoal — colaborador e sessão continuam fora do alcance dela.
+    @PreAuthorize("@access.isPlatformTeam() or @access.operatesCompany()")
     @Operation(summary = "Lista as cadeiras e o estado de conexão de cada uma")
     public ResponseEntity<ApiResponseDTO<Page<ChairResponseDTO>>> listAll(
             @ParameterObject ChairFilterDTO filter,
@@ -63,14 +69,14 @@ public class ChairController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("@collaboratorSecurity.hasAdminOrRhAccess()")
+    @PreAuthorize("@access.isPlatformTeam() or @access.operatesCompany()")
     @Operation(summary = "Busca uma cadeira por id")
     public ResponseEntity<ApiResponseDTO<ChairResponseDTO>> getById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponseDTO.success(chairService.findById(id), "Cadeira encontrada"));
     }
 
     @PostMapping
-    @PreAuthorize("@collaboratorSecurity.hasAdminOrRhAccess()")
+    @PreAuthorize("@access.operatesCompany()")
     @Operation(summary = "Cadastra uma cadeira pelo MAC address do ESP32")
     public ResponseEntity<ApiResponseDTO<ChairResponseDTO>> create(
             @RequestBody @Valid SaveChairRequestDTO dto) {
@@ -79,7 +85,7 @@ public class ChairController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("@collaboratorSecurity.hasAdminOrRhAccess()")
+    @PreAuthorize("@access.operatesCompany()")
     @Operation(summary = "Atualiza os dados de uma cadeira")
     public ResponseEntity<ApiResponseDTO<ChairResponseDTO>> update(@PathVariable Long id,
             @RequestBody @Valid SaveChairRequestDTO dto) {
@@ -95,7 +101,7 @@ public class ChairController {
      * regras de agendamento.
      */
     @PostMapping("/{id}/relay-test")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@access.isPlatformTeam() or @access.administersCompany()")
     @Operation(summary = "Liga o relé por alguns segundos para testar a instalação (somente ADMIN)")
     public ResponseEntity<ApiResponseDTO<Void>> testRelay(@PathVariable Long id,
             @RequestParam(name = "durationSeconds", defaultValue = "10") int durationSeconds) {
@@ -105,7 +111,7 @@ public class ChairController {
     }
 
     @PatchMapping("/{id}/toggle-active")
-    @PreAuthorize("@collaboratorSecurity.hasAdminOrRhAccess()")
+    @PreAuthorize("@access.operatesCompany()")
     @Operation(summary = "Ativa ou desativa uma cadeira")
     public ResponseEntity<ApiResponseDTO<ChairResponseDTO>> toggleActive(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponseDTO.success(chairService.toggleActive(id),
@@ -113,10 +119,47 @@ public class ChairController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("@collaboratorSecurity.hasAdminOrRhAccess()")
+    @PreAuthorize("@access.operatesCompany()")
     @Operation(summary = "Remove uma cadeira (soft delete)")
     public ResponseEntity<ApiResponseDTO<Void>> delete(@PathVariable Long id) {
         chairService.softDelete(id);
         return ResponseEntity.ok(ApiResponseDTO.success("Cadeira removida com sucesso"));
+    }
+
+    /**
+     * Grava a rede da empresa na memória do ESP32.
+     *
+     * <p>
+     * Exclusivo da equipe da plataforma: é ela quem instala o equipamento e
+     * conhece a rede do cliente. O RH não tem por que mexer em SSID de Wi-Fi, e
+     * a senha nem passa por esta rota — sai cifrada do cadastro da empresa e é
+     * decifrada só no instante do envio.
+     */
+    @PostMapping("/{id}/network")
+    @PreAuthorize("@access.isPlatformTeam()")
+    @Operation(summary = "Envia SSID, senha e BSSID para o ESP32 gravar na memória")
+    public ResponseEntity<ApiResponseDTO<ChairNetworkResultDTO>> pushNetwork(@PathVariable Long id) {
+        ChairNetworkResultDTO result = networkService.push(id);
+        return ResponseEntity.ok(ApiResponseDTO.success(result, result.message()));
+    }
+
+    /**
+     * Reenvia para todas as cadeiras ativas de uma empresa.
+     *
+     * <p>
+     * É o gesto que interessa depois de trocar a senha do Wi-Fi: uma a uma, a
+     * cadeira esquecida some da rede sem ninguém perceber até alguém tentar
+     * agendar.
+     */
+    @PostMapping("/network/company/{companyId}")
+    @PreAuthorize("@access.isPlatformTeam()")
+    @Operation(summary = "Reenvia a configuração de rede para as cadeiras de uma empresa")
+    public ResponseEntity<ApiResponseDTO<List<ChairNetworkResultDTO>>> pushNetworkToCompany(
+            @PathVariable Long companyId) {
+        List<ChairNetworkResultDTO> results = networkService.pushToCompany(companyId);
+
+        long delivered = results.stream().filter(ChairNetworkResultDTO::delivered).count();
+        return ResponseEntity.ok(ApiResponseDTO.success(results,
+                delivered + " de " + results.size() + " cadeira(s) receberam a configuração"));
     }
 }

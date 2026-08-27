@@ -6,55 +6,73 @@ import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface CollaboratorSessionRepository
-        extends JpaRepository<CollaboratorSession, Long>, JpaSpecificationExecutor<CollaboratorSession> {
+import br.rafaeros.fastrelax_api.core.tenancy.CompanyScopedRepository;
+
+/**
+ * Consultas de sessão.
+ *
+ * <p>
+ * As que recebem {@code companyId} são as do fluxo de requisição. As que não
+ * recebem são das rotinas de fundo, que varrem todas as empresas de propósito —
+ * lembrete e expiração não têm por que rodar uma vez por cliente.
+ */
+public interface CollaboratorSessionRepository extends CompanyScopedRepository<CollaboratorSession> {
 
     List<CollaboratorSession> findByCollaboratorId(Long collaboratorId);
 
-    /** Mirrors the partial unique index {@code uq_collaborator_active_session}. */
+    /** Espelha o índice parcial {@code uq_collaborator_active_session}. */
     Optional<CollaboratorSession> findByCollaboratorIdAndStatusIn(Long collaboratorId, List<SessionStatus> statuses);
 
-    List<CollaboratorSession> findBySessionDateAndStatusIn(LocalDate sessionDate, List<SessionStatus> statuses);
-
-    /** Base das agregações do painel do RH. */
-    List<CollaboratorSession> findBySessionDateBetween(LocalDate from, LocalDate to);
+    /** Base das agregações do painel. */
+    List<CollaboratorSession> findByCompanyIdAndSessionDateBetween(Long companyId, LocalDate from, LocalDate to);
 
     /** Ocupações de todo o período numa consulta só, em vez de uma por dia da grade. */
-    List<CollaboratorSession> findBySessionDateBetweenAndStatusIn(LocalDate from, LocalDate to,
-            List<SessionStatus> statuses);
+    List<CollaboratorSession> findByCompanyIdAndSessionDateBetweenAndStatusIn(Long companyId, LocalDate from,
+            LocalDate to, List<SessionStatus> statuses);
 
     /**
-     * Só existe um recurso de atendimento, então duas sessões ativas nunca podem
-     * se sobrepor no tempo — nem entre colaboradores diferentes. Intervalos são
-     * semiabertos: encostar (12:05 logo após 12:00–12:05) não é conflito.
+     * Quantas sessões ativas da empresa ocupam a faixa pedida.
+     *
+     * <p>
+     * Antes isto era um {@code exists}: havia uma cadeira só, então qualquer
+     * sobreposição era conflito. Com várias cadeiras por empresa, o horário só
+     * está cheio quando as sessões simultâneas igualam o número de cadeiras — e é
+     * por isso que a resposta virou contagem.
+     *
+     * <p>
+     * Intervalos são semiabertos: encostar (12:05 logo após 12:00–12:05) não
+     * conta como sobreposição.
      *
      * @param excludeId id a ignorar ao reagendar; use um valor inexistente (-1) ao criar
      */
     @Query("""
-            SELECT COUNT(s) > 0 FROM CollaboratorSession s
-            WHERE s.sessionDate = :sessionDate
+            SELECT COUNT(s) FROM CollaboratorSession s
+            WHERE s.company.id = :companyId
+              AND s.sessionDate = :sessionDate
               AND s.status IN :statuses
               AND s.id <> :excludeId
               AND s.startTime < :endTime
               AND s.endTime > :startTime
             """)
-    boolean existsOverlapping(@Param("sessionDate") LocalDate sessionDate,
+    long countOverlapping(@Param("companyId") Long companyId,
+            @Param("sessionDate") LocalDate sessionDate,
             @Param("statuses") List<SessionStatus> statuses,
             @Param("excludeId") Long excludeId,
             @Param("startTime") LocalTime startTime,
             @Param("endTime") LocalTime endTime);
 
-    /** Candidatas a expiração: sessões ainda ativas de hoje ou de dias anteriores. */
-    List<CollaboratorSession> findByStatusInAndSessionDateLessThanEqual(List<SessionStatus> statuses,
-            LocalDate sessionDate);
+    /**
+     * Candidatas a expiração, de todas as empresas: sessões ainda ativas de hoje
+     * ou de dias anteriores.
+     */
+    List<CollaboratorSession> findByCompanyIdAndStatusInAndSessionDateLessThanEqual(Long companyId,
+            List<SessionStatus> statuses, LocalDate sessionDate);
 
     /**
-     * Sessões agendadas que começam dentro da janela pedida.
+     * Sessões agendadas que começam dentro da janela pedida, em qualquer empresa.
      *
      * <p>
      * Nativa porque a comparação é com o instante do início — data mais hora —, e

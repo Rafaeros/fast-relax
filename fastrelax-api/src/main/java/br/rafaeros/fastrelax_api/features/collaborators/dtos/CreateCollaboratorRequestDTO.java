@@ -1,6 +1,7 @@
 package br.rafaeros.fastrelax_api.features.collaborators.dtos;
 
 import br.rafaeros.fastrelax_api.core.validation.Cpf;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -21,5 +22,13 @@ public record CreateCollaboratorRequestDTO(
 
     @NotBlank(message = "O telefone é obrigatório")
     @Size(max = 20, message = "O telefone deve ter no máximo 20 caracteres")
-    String phoneNumber
+    String phoneNumber,
+
+    /**
+     * Opcional. Preenchido, a pessoa recebe um convite e define a própria senha;
+     * em branco, o sistema gera uma temporária para o RH repassar.
+     */
+    @Email(message = "O email deve ser válido")
+    @Size(max = 180, message = "O email deve ter no máximo 180 caracteres")
+    String email
 ) {}

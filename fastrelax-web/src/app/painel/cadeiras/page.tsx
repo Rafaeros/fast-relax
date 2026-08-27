@@ -4,21 +4,34 @@ import { emptyPageSlice, toPageSlice } from "@/lib/api/pagination.types";
 import { fetchChairsPage } from "@/features/chairs/actions/chair.actions";
 import { ChairsTable } from "@/features/chairs/components/ChairsTable";
 import { listChairs } from "@/features/chairs/services/chair.service";
-import { getCurrentUser } from "@/features/authentication/services/auth.service";
-import type { Chair } from "@/features/chairs/types/chair.types";
+import { requirePanelUser } from "@/features/authentication/lib/guards";
+import { administersCompany, isPlatformTeam } from "@/features/authentication/lib/roles";
+import { listFirmwareOptions } from "@/features/firmwares/services/firmware.service";
+import type { Chair, FirmwareOption } from "@/features/chairs/types/chair.types";
 
 export const metadata: Metadata = {
   title: "Cadeiras — physical",
 };
 
 export default async function CadeirasPage() {
+  // Os três papéis entram, por motivos diferentes: a empresa opera o próprio
+  // parque, e a equipe da plataforma enxerga o de todos os clientes porque é
+  // ela quem instala o equipamento e configura a rede dele. Cadeira é ativo da
+  // Physical — colaborador e sessão continuam fora do alcance dela.
+  const user = await requirePanelUser(["SYSADMIN", "COMPANY_ADMIN", "COMPANY_RH"]);
+
   // Primeira página no servidor: a tabela chega preenchida, sem piscar vazia.
-  const result = await listChairs({ page: 0 });
+  // As versões vêm junto porque o formulário precisa delas ao abrir.
+  const [result, firmwares] = await Promise.all([listChairs({ page: 0 }), listFirmwareOptions()]);
   const initialSlice = result.ok ? toPageSlice(result.data) : emptyPageSlice<Chair>();
 
-  // O perfil sai daqui porque o teste de relé só aparece para ADMIN. O layout
-  // do painel já garantiu que há sessão válida.
-  const user = await getCurrentUser();
+  const firmwareOptions: FirmwareOption[] = firmwares.ok
+    ? firmwares.data.content.map((firmware) => ({
+        id: firmware.id,
+        version: firmware.version,
+        productName: firmware.productName,
+      }))
+    : [];
 
   return (
     // Altura de uma tela: a lista rola dentro da tabela, o resto fica parado.
@@ -32,7 +45,10 @@ export default async function CadeirasPage() {
       <ChairsTable
         initialSlice={initialSlice}
         loadPage={fetchChairsPage}
-        isAdmin={user?.role === "ADMIN"}
+        // O teste de relé aciona o equipamento de verdade: fica com o gestor.
+        isAdmin={administersCompany(user) || isPlatformTeam(user)}
+        isPlatformTeam={isPlatformTeam(user)}
+        firmwares={firmwareOptions}
       />
     </div>
   );

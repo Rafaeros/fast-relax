@@ -11,6 +11,7 @@ import {
   type SessionSettings,
   type SessionSettingsField,
 } from "@/features/settings/types/session-settings.types";
+import { hasFieldErrors } from "@/lib/forms";
 
 export type SessionSettingsFormProps = {
   settings: SessionSettings;
@@ -78,7 +79,7 @@ export function SessionSettingsForm({ settings, onSaved }: SessionSettingsFormPr
 
       // Limite fora da faixa aparece no próprio campo; o resto vem do servidor
       // e vai por toast.
-      if (result.message && !result.fieldErrors) toast.error(result.message);
+      if (result.message && !hasFieldErrors(result.fieldErrors)) toast.error(result.message);
     });
   };
 

@@ -17,8 +17,14 @@ export async function loginAction(
   _previousState: LoginFormState,
   formData: FormData,
 ): Promise<LoginFormState> {
+  // Devolvido em toda saída de erro: o React limpa os campos não controlados
+  // depois de uma action, e sem isto errar a senha custava redigitar o e-mail.
+  // A senha fica de fora de propósito — reexibi-la a mandaria de volta pela
+  // rede, no payload que o navegador guarda.
+  const email = String(formData.get("email") ?? "");
+
   const validation = validateLoginInput({
-    email: String(formData.get("email") ?? ""),
+    email,
     password: String(formData.get("password") ?? ""),
   });
 
@@ -27,6 +33,7 @@ export async function loginAction(
       status: "error",
       message: "Confira os campos destacados.",
       fieldErrors: validation.fieldErrors,
+      email,
     };
   }
 
@@ -34,7 +41,7 @@ export async function loginAction(
 
   if (!result.ok) {
     // A API já responde com mensagem genérica em 401, sem revelar se o e-mail existe.
-    return { status: "error", message: result.message };
+    return { status: "error", message: result.message, email };
   }
 
   await createSession(result.data);
@@ -42,6 +49,7 @@ export async function loginAction(
   // Layout e header passam a enxergar o usuário logado.
   revalidatePath("/", "layout");
 
-  // Enquanto a senha temporária não for trocada, o backend bloqueia o resto da API.
-  redirect(result.data.mustChangePassword ? "/painel?senha=trocar" : "/painel");
+  // Enquanto a senha temporária não for trocada, o backend bloqueia o resto da
+  // API: mandar para o painel só renderizaria uma tela de erro.
+  redirect(result.data.mustChangePassword ? "/definir-senha" : "/painel");
 }

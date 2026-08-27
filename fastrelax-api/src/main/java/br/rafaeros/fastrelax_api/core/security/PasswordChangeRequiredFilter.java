@@ -9,7 +9,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-import br.rafaeros.fastrelax_api.features.users.User;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -20,16 +19,23 @@ import jakarta.servlet.http.HttpServletResponse;
  *
  * <p>
  * Sem isto, {@code mustChangePassword} seria apenas uma sugestão que o cliente
- * poderia ignorar — o usuário continuaria operando com a senha que outra pessoa
- * escolheu por ele.
+ * poderia ignorar — a pessoa continuaria operando com a senha que outra escolheu
+ * por ela.
+ *
+ * <p>
+ * Vale para qualquer {@link CredentialHolder}: desde que o colaborador ganhou
+ * senha própria, ele passou pela mesma exigência do painel, e o filtro não
+ * precisou aprender um segundo tipo para isso.
  */
 @Component
 public class PasswordChangeRequiredFilter extends OncePerRequestFilter {
 
-    /** O mínimo para o usuário conseguir sair dessa situação. */
+    /** O mínimo para o dono da credencial conseguir sair dessa situação. */
     private static final Set<String> ALLOWED_PATHS = Set.of(
-            "/users/me/first-access-password",
             "/users/me",
+            "/users/me/first-access-password",
+            "/collaborators/me",
+            "/collaborators/me/first-access-password",
             "/auth/logout",
             "/auth/refresh");
 
@@ -41,8 +47,8 @@ public class PasswordChangeRequiredFilter extends OncePerRequestFilter {
 
         var authentication = SecurityContextHolder.getContext().getAuthentication();
         boolean blocked = authentication != null
-                && authentication.getPrincipal() instanceof User user
-                && user.isMustChangePassword()
+                && authentication.getPrincipal() instanceof CredentialHolder holder
+                && holder.isMustChangePassword()
                 && !isAllowed(request);
 
         if (blocked) {

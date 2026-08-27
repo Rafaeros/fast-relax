@@ -1,9 +1,24 @@
+import type { CredentialDelivery } from "@/features/authentication/types/auth.types";
+
 /** Espelha `ImportRowErrorDTO`. */
 export type ImportRowError = {
   /** Número da linha como aparece no Excel. */
   row: number;
   name: string | null;
   reason: string;
+};
+
+/**
+ * Espelha `ImportedCredentialDTO`.
+ *
+ * Aparece só nesta resposta: o banco guarda apenas o hash, então o RH precisa
+ * distribuir estas senhas antes de fechar a tela. O CPF vem mascarado pelo
+ * backend — a lista é feita para ser exibida e impressa.
+ */
+export type ImportedCredential = {
+  name: string;
+  cpf: string;
+  delivery: CredentialDelivery;
 };
 
 /** Espelha `ImportResultDTO`. */
@@ -16,6 +31,8 @@ export type ImportResult = {
   collaboratorsUpdated: number;
   schedulesSaved: number;
   errors: ImportRowError[];
+  /** Senhas dos colaboradores criados nesta importação, exibidas uma única vez. */
+  credentials: ImportedCredential[];
 };
 
 export type ImportFormState = {

@@ -27,6 +27,17 @@ export function ViewCollaboratorModal({
         { label: "CPF", value: formatCpf(collaborator.cpf) },
         { label: "Telefone", value: formatPhone(collaborator.phoneNumber) },
         { label: "Departamento", value: collaborator.departmentName ?? "—" },
+        { label: "E-mail", value: collaborator.email ?? "Não cadastrado" },
+        {
+          // Diz ao RH se a pessoa já entrou no app: senha temporária pendente é a
+          // explicação mais comum para "cadastrei e ela não consegue agendar".
+          label: "Senha",
+          value: (
+            <Badge tone={collaborator.mustChangePassword ? "warning" : "success"}>
+              {collaborator.mustChangePassword ? "Temporária" : "Definida"}
+            </Badge>
+          ),
+        },
         {
           label: "Situação",
           value: (

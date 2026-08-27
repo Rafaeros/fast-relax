@@ -25,7 +25,8 @@ import { ChairsFilterModal } from "@/features/chairs/components/ChairsFilterModa
 import { CreateChairModal } from "@/features/chairs/components/CreateChairModal";
 import { EditChairModal } from "@/features/chairs/components/EditChairModal";
 import { ViewChairModal } from "@/features/chairs/components/ViewChairModal";
-import type { Chair, ChairFilter } from "@/features/chairs/types/chair.types";
+import { PushNetworkAction } from "@/features/chairs/components/PushNetworkAction";
+import type { Chair, ChairFilter, FirmwareOption } from "@/features/chairs/types/chair.types";
 
 export type ChairsTableProps = {
   initialSlice: PageSlice<Chair>;
@@ -36,9 +37,24 @@ export type ChairsTableProps = {
    * `@PreAuthorize` do backend.
    */
   isAdmin?: boolean;
+  /**
+   * Quem está logado é da equipe da plataforma.
+   *
+   * Muda a tabela em duas frentes: aparece a coluna da empresa — a listagem
+   * atravessa clientes — e a ação de gravar a rede no ESP32, que é dela.
+   */
+  isPlatformTeam?: boolean;
+  /** Versões do catálogo, para registrar o firmware gravado em cada cadeira. */
+  firmwares?: FirmwareOption[];
 };
 
-export function ChairsTable({ initialSlice, loadPage, isAdmin = false }: ChairsTableProps) {
+export function ChairsTable({
+  initialSlice,
+  loadPage,
+  isAdmin = false,
+  isPlatformTeam = false,
+  firmwares = [],
+}: ChairsTableProps) {
   // Incrementar o sinal faz a tabela descartar o que está em tela e recarregar
   // da primeira página — é assim que cadastro e edição aparecem na hora.
   const [reloadSignal, setReloadSignal] = useState(0);
@@ -82,6 +98,20 @@ export function ChairsTable({ initialSlice, loadPage, isAdmin = false }: ChairsT
         header: "Nome",
         cell: (row) => <TableIdentity name={row.name} secondary={row.macAddress} />,
       },
+      // A coluna só existe para a equipe da plataforma: a listagem dela
+      // atravessa clientes, e sem o nome o parque vira uma lista sem contexto.
+      // Para quem opera dentro de uma empresa é sempre a própria.
+      ...(isPlatformTeam
+        ? [
+            {
+              id: "company",
+              header: "Empresa",
+              cell: (row: Chair) => (
+                <span className="text-ink-secondary">{row.companyName ?? "—"}</span>
+              ),
+            } as DataTableColumn<Chair>,
+          ]
+        : []),
       {
         id: "online",
         header: "Conexão",
@@ -91,6 +121,21 @@ export function ChairsTable({ initialSlice, loadPage, isAdmin = false }: ChairsT
           </Badge>
         ),
       },
+      // Estado do provisionamento, e não da conexão: uma cadeira pode estar
+      // online pela rede antiga e ainda assim fora da configuração atual —
+      // é essa a que some quando o AP velho for desligado.
+      ...(isPlatformTeam
+        ? [
+            {
+              id: "network",
+              header: "Rede",
+              hideOnMobile: true,
+              cell: (row: Chair) => (
+                <Badge tone={networkTone(row)}>{networkLabel(row)}</Badge>
+              ),
+            } as DataTableColumn<Chair>,
+          ]
+        : []),
       {
         id: "address",
         header: "Endereço",
@@ -127,6 +172,7 @@ export function ChairsTable({ initialSlice, loadPage, isAdmin = false }: ChairsT
           <RowActions>
             <ViewAction onClick={() => setViewing(row)} />
             <EditAction onClick={() => setEditing(row)} />
+            {isPlatformTeam && <PushNetworkAction chair={row} onPushed={reload} />}
             <RowAction
               label={row.active ? "Desativar" : "Ativar"}
               icon={row.active ? "eyeOff" : "check"}
@@ -159,7 +205,7 @@ export function ChairsTable({ initialSlice, loadPage, isAdmin = false }: ChairsT
         ),
       },
     ],
-    [toast],
+    [toast, isPlatformTeam],
   );
 
   return (
@@ -179,7 +225,7 @@ export function ChairsTable({ initialSlice, loadPage, isAdmin = false }: ChairsT
             searchValue={search}
             onSearchChange={setSearch}
             filter={<ChairsFilterModal value={filters} onApply={setFilters} />}
-            action={<CreateChairModal onCreated={reload} />}
+            action={<CreateChairModal onCreated={reload} firmwares={firmwares} />}
           />
         }
         emptyMessage={
@@ -199,7 +245,33 @@ export function ChairsTable({ initialSlice, loadPage, isAdmin = false }: ChairsT
         }}
       />
 
-      <EditChairModal chair={editing} onClose={() => setEditing(null)} onUpdated={reload} />
+      <EditChairModal
+        chair={editing}
+        onClose={() => setEditing(null)}
+        onUpdated={reload}
+        firmwares={firmwares}
+      />
     </>
   );
+}
+
+/**
+ * Estado do provisionamento de rede.
+ *
+ * <p>
+ * Três situações que a tela precisa distinguir, e que um booleano juntaria:
+ * nunca configurada, configurada e aplicada, e configurada mas rodando outra
+ * rede — a última é a que dá trabalho, porque a cadeira parece bem até o AP
+ * antigo sair do ar.
+ */
+function networkLabel(chair: Chair): string {
+  if (chair.onConfiguredNetwork) return "Aplicada";
+  if (chair.networkSyncedAt) return "Enviada";
+  return "Não configurada";
+}
+
+function networkTone(chair: Chair): "success" | "warning" | "neutral" {
+  if (chair.onConfiguredNetwork) return "success";
+  if (chair.networkSyncedAt) return "warning";
+  return "neutral";
 }

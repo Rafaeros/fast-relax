@@ -7,8 +7,13 @@ import type {
 } from "@/features/settings/types/session-settings.types";
 
 /**
- * Configurações globais das sessões (`/settings/sessions`).
- * Leitura é liberada a qualquer autenticado; a alteração exige ADMIN ou RH.
+ * Configurações de sessão da empresa (`/settings/sessions`).
+ *
+ * Deixaram de ser globais quando o produto virou multi-empresa: duração e
+ * antecedência são acordos de cada contrato. O backend resolve a empresa pelo
+ * token, então não há id na URL.
+ *
+ * Leitura é liberada a qualquer autenticado; alterar exige gestor ou RH.
  */
 
 const RESOURCE = "/settings/sessions";

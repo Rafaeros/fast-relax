@@ -5,6 +5,7 @@ import { Button, Icon, Modal, useToast } from "@/components/ui";
 import { createDepartmentAction } from "@/features/departments/actions/department.actions";
 import { DepartmentFormFields } from "@/features/departments/components/DepartmentFormFields";
 import { DEPARTMENT_INITIAL_STATE } from "@/features/departments/types/department.types";
+import { hasFieldErrors } from "@/lib/forms";
 
 export type CreateDepartmentModalProps = {
   /** Disparado após o cadastro dar certo — a tabela recarrega a partir daqui. */
@@ -48,7 +49,7 @@ export function CreateDepartmentModal({ onCreated }: CreateDepartmentModalProps)
 
       // Erro de campo fica no formulário, ao lado do input a corrigir. O recado
       // geral do servidor vai para o toast, que não depende do modal aberto.
-      if (result.message && !result.fieldErrors) toast.error(result.message);
+      if (result.message && !hasFieldErrors(result.fieldErrors)) toast.error(result.message);
       setState(result);
     });
   };

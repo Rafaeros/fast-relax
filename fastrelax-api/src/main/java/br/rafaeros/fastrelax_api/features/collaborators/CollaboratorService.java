@@ -1,19 +1,22 @@
 package br.rafaeros.fastrelax_api.features.collaborators;
 
-import java.time.LocalDateTime;
 import java.util.Objects;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
-import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import br.rafaeros.fastrelax_api.core.crypto.CryptoService;
 import br.rafaeros.fastrelax_api.core.exceptions.BusinessException;
 import br.rafaeros.fastrelax_api.core.exceptions.ResourceNotFoundException;
+import br.rafaeros.fastrelax_api.core.dto.CredentialDeliveryDTO;
+import br.rafaeros.fastrelax_api.core.security.CredentialProvisioning;
+import br.rafaeros.fastrelax_api.core.security.CredentialProvisioningService;
+import br.rafaeros.fastrelax_api.core.security.CredentialService;
+import br.rafaeros.fastrelax_api.core.security.Principals;
+import br.rafaeros.fastrelax_api.core.tenancy.CurrentTenant;
 import br.rafaeros.fastrelax_api.core.util.CpfUtils;
 import br.rafaeros.fastrelax_api.core.util.PhoneUtils;
 import br.rafaeros.fastrelax_api.features.auth.RefreshToken;
@@ -21,7 +24,9 @@ import br.rafaeros.fastrelax_api.features.auth.RefreshTokenService;
 import br.rafaeros.fastrelax_api.features.collaborators.dtos.CollaboratorFilterDTO;
 import br.rafaeros.fastrelax_api.features.collaborators.dtos.CollaboratorResponseDTO;
 import br.rafaeros.fastrelax_api.features.collaborators.dtos.CreateCollaboratorRequestDTO;
+import br.rafaeros.fastrelax_api.features.collaborators.dtos.CreatedCollaboratorResponseDTO;
 import br.rafaeros.fastrelax_api.features.collaborators.dtos.UpdateCollaboratorDTO;
+import br.rafaeros.fastrelax_api.features.departments.Department;
 import br.rafaeros.fastrelax_api.features.departments.DepartmentRepository;
 import lombok.RequiredArgsConstructor;
 
@@ -32,13 +37,16 @@ public class CollaboratorService {
     private final CollaboratorRepository collaboratorRepository;
     private final DepartmentRepository departmentRepository;
     private final CryptoService cryptoService;
+    private final CredentialService credentialService;
+    private final CredentialProvisioningService provisioningService;
     private final RefreshTokenService refreshTokenService;
+    private final CurrentTenant currentTenant;
 
     public Page<CollaboratorResponseDTO> findAll(CollaboratorFilterDTO dto,
             @org.springframework.lang.NonNull Pageable pageable) {
-        // The CPF filter runs against the blind index, so it needs the full CPF.
+        // O filtro por CPF roda contra o blind index, então precisa do CPF inteiro.
         String cpfHash = (dto != null && dto.cpf() != null && !dto.cpf().isBlank())
-                ? cryptoService.blindIndex(normalizeCpf(dto.cpf()))
+                ? cryptoService.blindIndex(CpfUtils.normalize(dto.cpf()))
                 : null;
 
         Specification<Collaborator> spec = Specification.allOf(
@@ -48,8 +56,8 @@ public class CollaboratorService {
                 CollaboratorSpecifications.phoneNumberContains(dto != null ? dto.phoneNumber() : null),
                 CollaboratorSpecifications.inDepartment(dto != null ? dto.departmentId() : null));
 
-        return collaboratorRepository.findAll(spec, Objects.requireNonNull(pageable))
-                .map(collaborator -> toResponse(collaborator));
+        return collaboratorRepository.findAllScoped(spec, Objects.requireNonNull(pageable))
+                .map(this::toResponse);
     }
 
     public CollaboratorResponseDTO findById(Long id) {
@@ -62,25 +70,13 @@ public class CollaboratorService {
      * do banco para refletir alterações feitas pelo RH após a emissão do token.
      */
     public CollaboratorResponseDTO findAuthenticated() {
-        var authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !(authentication.getPrincipal() instanceof Collaborator logged)) {
-            throw new AccessDeniedException("Rota disponível apenas para colaboradores autenticados");
-        }
-        return toResponse(collaboratorRepository.findById(Objects.requireNonNull(logged.getId()))
-                .orElseThrow(() -> new ResourceNotFoundException("Colaborador não encontrado")));
+        Collaborator logged = Principals.requireCollaborator();
+        return toResponse(findEntityById(logged.getId()));
     }
 
-    /** Entity lookup for authentication — callers outside auth should use {@link #findById(Long)}. */
-    public Collaborator findByCpf(String cpf) {
-        Collaborator collaborator = collaboratorRepository
-                .findByCpfHash(cryptoService.blindIndex(normalizeCpf(cpf)))
-                .orElseThrow(() -> new BusinessException("Colaborador não encontrado"));
-
-        if (!collaborator.isActive()) {
-            throw new BusinessException("Seu acesso está desativado. Entre em contato com o RH.");
-        }
-
-        return collaborator;
+    /** Entidade crua do colaborador logado, para quem precisa alterá-la. */
+    public Collaborator requireAuthenticatedEntity() {
+        return findEntityById(Principals.requireCollaborator().getId());
     }
 
     @Transactional
@@ -95,33 +91,80 @@ public class CollaboratorService {
         return toResponse(collaboratorRepository.save(collaborator));
     }
 
+    /**
+     * Cadastro pelo RH.
+     *
+     * <p>
+     * Com e-mail preenchido, a pessoa recebe um convite e define a própria senha;
+     * sem e-mail, sai uma temporária na resposta — uma única vez, porque o banco
+     * guarda só o hash. Quem decide é o {@link CredentialProvisioningService}, o
+     * mesmo do cadastro de usuário do painel.
+     */
     @Transactional
-    public CollaboratorResponseDTO create(CreateCollaboratorRequestDTO dto) {
-        String cpf = normalizeCpf(dto.cpf());
+    public CreatedCollaboratorResponseDTO create(CreateCollaboratorRequestDTO dto) {
+        String cpf = CpfUtils.normalize(dto.cpf());
         String cpfHash = cryptoService.blindIndex(cpf);
 
-        Collaborator existing = collaboratorRepository.findByCpfHashIncludingDeleted(cpfHash).orElse(null);
-        if (existing != null) {
-            if (existing.getDeletedAt() == null) {
-                throw new BusinessException("Já existe um colaborador cadastrado com este CPF");
-            }
-            // Reactivate the soft-deleted row instead of violating the unique constraint.
-            existing.setDeletedAt(null);
-            existing.setActive(true);
-            existing.setDepartment(findDepartment(dto.departmentId()));
-            existing.setName(dto.name());
-            existing.setPhoneNumber(PhoneUtils.normalize(dto.phoneNumber()));
-            return toResponse(collaboratorRepository.save(existing));
-        }
+        Collaborator collaborator = collaboratorRepository
+                .findByCpfHashIncludingDeleted(currentTenant.companyId(), cpfHash)
+                .map(existing -> {
+                    if (!existing.isDeleted()) {
+                        throw new BusinessException("Já existe um colaborador cadastrado com este CPF");
+                    }
+                    // Reativa o removido: a constraint uq_collaborators_company_cpf
+                    // não ignora soft delete, então inserir outro estouraria.
+                    existing.restore();
+                    return existing;
+                })
+                .orElseGet(() -> {
+                    Collaborator created = new Collaborator();
+                    created.setCompany(currentTenant.reference());
+                    created.setCpfEncrypted(cryptoService.encrypt(cpf));
+                    created.setCpfHash(cpfHash);
+                    return created;
+                });
 
-        Collaborator collaborator = new Collaborator();
         collaborator.setDepartment(findDepartment(dto.departmentId()));
         collaborator.setName(dto.name());
-        collaborator.setCpfEncrypted(cryptoService.encrypt(cpf));
-        collaborator.setCpfHash(cpfHash);
         collaborator.setPhoneNumber(PhoneUtils.normalize(dto.phoneNumber()));
+        applyEmail(collaborator, dto.email());
 
-        return toResponse(collaboratorRepository.save(collaborator));
+        // Vale tanto para o cadastro novo quanto para a reativação: quem volta não
+        // pode voltar com a credencial que tinha antes de ser removido.
+        provisioningService.initialize(collaborator);
+        Collaborator saved = collaboratorRepository.save(collaborator);
+
+        CredentialProvisioning provisioning = provisioningService.provision(saved);
+
+        return new CreatedCollaboratorResponseDTO(
+                toResponse(saved), CredentialDeliveryDTO.from(provisioning));
+    }
+
+    /**
+     * Grava o e-mail, em branco vira nulo.
+     *
+     * <p>
+     * String vazia não pode chegar ao banco: o índice único ignora nulos, mas
+     * trataria dois vazios como colisão — e o segundo colaborador sem e-mail
+     * seria recusado por um conflito que não existe.
+     */
+    private void applyEmail(Collaborator collaborator, String rawEmail) {
+        String email = rawEmail == null ? "" : rawEmail.trim().toLowerCase();
+
+        if (email.isEmpty()) {
+            collaborator.setEmail(null);
+            return;
+        }
+
+        collaboratorRepository
+                .findByCompanyIdAndEmailIgnoreCaseAndIdNot(
+                        currentTenant.companyId(), email,
+                        collaborator.getId() == null ? -1L : collaborator.getId())
+                .ifPresent(other -> {
+                    throw new BusinessException("Já existe um colaborador com este e-mail");
+                });
+
+        collaborator.setEmail(email);
     }
 
     @Transactional
@@ -133,33 +176,47 @@ public class CollaboratorService {
         collaborator.setName(dto.name());
         collaborator.setPhoneNumber(PhoneUtils.normalize(dto.phoneNumber()));
         collaborator.setActive(dto.active());
+        applyEmail(collaborator, dto.email());
         applyCpfChange(collaborator, dto.cpf());
 
         return toResponse(collaboratorRepository.save(collaborator));
     }
 
     /**
+     * Redefinição pelo RH: gera uma temporária, devolve uma única vez e obriga o
+     * colaborador a trocá-la no próximo acesso.
+     *
+     * @return a senha temporária em claro, para o RH repassar
+     */
+    @Transactional
+    public String resetPassword(Long id) {
+        Collaborator collaborator = findEntityById(id);
+        String temporaryPassword = credentialService.resetToTemporaryPassword(collaborator);
+        collaboratorRepository.save(collaborator);
+        return temporaryPassword;
+    }
+
+    /**
      * Corrige um CPF cadastrado errado. Campo ausente ou em branco mantém o atual;
-     * um CPF igual ao que já está gravado também é ignorado, para que reenviar o
-     * registro inteiro não conte como troca de credencial.
+     * um CPF igual ao que já está gravado também é ignorado.
      */
     private void applyCpfChange(Collaborator collaborator, String rawCpf) {
         if (rawCpf == null || rawCpf.isBlank()) {
             return;
         }
-        String cpf = normalizeCpf(rawCpf);
+        String cpf = CpfUtils.normalize(rawCpf);
         String cpfHash = cryptoService.blindIndex(cpf);
         if (cpfHash.equals(collaborator.getCpfHash())) {
             return;
         }
 
-        collaboratorRepository.findByCpfHashIncludingDeleted(cpfHash)
+        collaboratorRepository.findByCpfHashIncludingDeleted(currentTenant.companyId(), cpfHash)
                 .filter(other -> !other.getId().equals(collaborator.getId()))
                 .ifPresent(other -> {
                     // Inclui soft-deletados: a constraint unique não os ignora.
-                    throw new BusinessException(other.getDeletedAt() == null
-                            ? "Já existe um colaborador cadastrado com este CPF"
-                            : "Existe um colaborador removido com este CPF; reative-o em vez de duplicar");
+                    throw new BusinessException(other.isDeleted()
+                            ? "Existe um colaborador removido com este CPF; reative-o em vez de duplicar"
+                            : "Já existe um colaborador cadastrado com este CPF");
                 });
 
         collaborator.setCpfEncrypted(cryptoService.encrypt(cpf));
@@ -169,33 +226,27 @@ public class CollaboratorService {
     @Transactional
     public void softDelete(Long id) {
         Collaborator collaborator = findEntityById(id);
-        collaborator.setActive(false);
-        collaborator.setDeletedAt(LocalDateTime.now());
+        collaborator.markDeleted();
         collaboratorRepository.save(collaborator);
         refreshTokenService.revokeAllFor(RefreshToken.SubjectType.COLLABORATOR, collaborator.getId());
     }
 
+    /** Escopada: um id de outra empresa responde 404, como se não existisse. */
     private Collaborator findEntityById(Long id) {
-        return collaboratorRepository.findById(Objects.requireNonNull(id))
+        return collaboratorRepository.findByIdScoped(Objects.requireNonNull(id))
                 .orElseThrow(() -> new ResourceNotFoundException("Colaborador não encontrado"));
     }
 
-    private br.rafaeros.fastrelax_api.features.departments.Department findDepartment(Long departmentId) {
-        return departmentRepository.findById(Objects.requireNonNull(departmentId))
+    /**
+     * Também escopado: sem isto, um {@code departmentId} de outro cliente ligaria
+     * um colaborador a um departamento que não é da empresa dele.
+     */
+    private Department findDepartment(Long departmentId) {
+        return departmentRepository.findByIdScoped(Objects.requireNonNull(departmentId))
                 .orElseThrow(() -> new ResourceNotFoundException("Departamento não encontrado"));
     }
 
     private CollaboratorResponseDTO toResponse(Collaborator collaborator) {
         return new CollaboratorResponseDTO(collaborator, cryptoService.decrypt(collaborator.getCpfEncrypted()));
-    }
-
-    /**
-     * Os DTOs já exigem 11 dígitos sem pontuação; isto é a rede de segurança que
-     * garante que o blind index seja sempre calculado sobre o mesmo formato —
-     * caso contrário "123.456.789-00" e "12345678900" gerariam digests
-     * diferentes e a constraint de unicidade seria trivial de burlar.
-     */
-    private String normalizeCpf(String cpf) {
-        return CpfUtils.normalize(cpf);
     }
 }

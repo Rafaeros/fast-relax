@@ -28,13 +28,19 @@ import br.rafaeros.fastrelax_api.core.exceptions.BusinessException;
  */
 final class CollaboratorSheetBuilder {
 
+    /**
+     * E-mail entra por último de propósito: planilha antiga, sem a coluna,
+     * continua sendo aceita — a linha só entra sem e-mail, e a pessoa recebe
+     * senha temporária em vez de convite.
+     */
     static final String[] HEADERS = {
-            "Nome", "CPF", "Telefone", "Departamento", "Inicio Almoco", "Fim Almoco"
+            "Nome", "CPF", "Telefone", "Departamento", "Inicio Almoco", "Fim Almoco", "Email"
     };
 
     /** Exemplo com máscara: comunica que CPF e telefone podem vir formatados. */
     static final String[] SAMPLE = {
-            "Renata Perez", "123.456.789-00", "(43) 98412-8306", "Recursos Humanos", "12:00", "13:00"
+            "Renata Perez", "123.456.789-00", "(43) 98412-8306", "Recursos Humanos", "12:00", "13:00",
+            "renata.perez@empresa.com"
     };
 
     private CollaboratorSheetBuilder() {

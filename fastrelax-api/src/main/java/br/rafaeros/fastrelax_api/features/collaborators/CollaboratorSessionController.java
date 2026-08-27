@@ -90,7 +90,7 @@ public class CollaboratorSessionController {
     }
 
     @PostMapping
-    @PreAuthorize("@collaboratorSecurity.canAccessCollaborator(#dto.collaboratorId())")
+    @PreAuthorize("@access.canAccessCollaborator(#dto.collaboratorId())")
     @Operation(summary = "Agenda uma sessão dentro do horário permitido")
     public ResponseEntity<ApiResponseDTO<CollaboratorSessionResponseDTO>> create(
             @RequestBody @Valid CollaboratorSessionDTO dto) {
@@ -100,7 +100,7 @@ public class CollaboratorSessionController {
 
     /** Reagenda data e horário. Para mudar de estado use as transições abaixo. */
     @PutMapping("/{id}")
-    @PreAuthorize("@collaboratorSecurity.canAccessCollaborator(#dto.collaboratorId())")
+    @PreAuthorize("@access.canAccessCollaborator(#dto.collaboratorId())")
     @Operation(summary = "Reagenda data e horário de uma sessão ainda agendada")
     public ResponseEntity<ApiResponseDTO<CollaboratorSessionResponseDTO>> update(@PathVariable Long id,
             @RequestBody @Valid CollaboratorSessionDTO dto) {

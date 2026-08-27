@@ -84,8 +84,9 @@ export function UsersFilterModal({ value, onApply }: UsersFilterModalProps) {
             defaultValue={value.role ?? ""}
             options={[
               { label: "Todos", value: "" },
-              { label: "ADMIN", value: "ADMIN" },
-              { label: "RH", value: "RH" },
+              { label: "Administrador da plataforma", value: "SYSADMIN" },
+              { label: "Gestor da empresa", value: "COMPANY_ADMIN" },
+              { label: "RH da empresa", value: "COMPANY_RH" },
             ]}
           />
 

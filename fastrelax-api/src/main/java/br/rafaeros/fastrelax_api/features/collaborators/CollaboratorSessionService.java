@@ -12,10 +12,11 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import br.rafaeros.fastrelax_api.core.security.Principals;
+import br.rafaeros.fastrelax_api.core.security.AccessGuard;
 import br.rafaeros.fastrelax_api.core.exceptions.BusinessException;
 import br.rafaeros.fastrelax_api.core.exceptions.ResourceNotFoundException;
 import br.rafaeros.fastrelax_api.features.collaborators.dtos.AvailableDayDTO;
@@ -42,11 +43,13 @@ public class CollaboratorSessionService {
     private final CollaboratorSessionRepository sessionRepository;
     private final CollaboratorRepository collaboratorRepository;
     private final CollaboratorWorkScheduleRepository workScheduleRepository;
-    private final CollaboratorSecurity collaboratorSecurity;
+    private final AccessGuard access;
     private final SessionSettingsService sessionSettingsService;
     private final SessionExpirationService sessionExpirationService;
     private final br.rafaeros.fastrelax_api.features.chairs.ChairCommandService chairCommandService;
+    private final br.rafaeros.fastrelax_api.features.chairs.ChairService chairService;
     private final org.springframework.context.ApplicationEventPublisher events;
+    private final br.rafaeros.fastrelax_api.core.tenancy.CurrentTenant currentTenant;
 
     public Page<CollaboratorSessionResponseDTO> findAll(CollaboratorSessionFilterDTO dto,
             @org.springframework.lang.NonNull Pageable pageable) {
@@ -54,13 +57,10 @@ public class CollaboratorSessionService {
         // duas execuções do job.
         sessionExpirationService.expireAbandonedSessions();
 
-        // A logged collaborator may only see their own sessions, so their id
-        // overrides any collaboratorId supplied in the filter.
+        // Colaborador logado só vê as próprias linhas: o id dele sobrepõe qualquer
+        // collaboratorId que venha no filtro.
         Long collaboratorId = dto != null ? dto.collaboratorId() : null;
-        var authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication != null && authentication.getPrincipal() instanceof Collaborator loggedCollab) {
-            collaboratorId = loggedCollab.getId();
-        }
+        collaboratorId = Principals.collaborator().map(Collaborator::getId).orElse(collaboratorId);
 
         Specification<CollaboratorSession> spec = Specification.allOf(
                 CollaboratorSessionSpecifications.hasStatus(dto != null ? dto.status() : null),
@@ -69,7 +69,7 @@ public class CollaboratorSessionService {
                         dto != null ? dto.to() : null),
                 CollaboratorSessionSpecifications.hasCollaborator(collaboratorId));
 
-        return sessionRepository.findAll(spec, Objects.requireNonNull(pageable))
+        return sessionRepository.findAllScoped(spec, Objects.requireNonNull(pageable))
                 .map(session -> new CollaboratorSessionResponseDTO(session));
     }
 
@@ -109,8 +109,8 @@ public class CollaboratorSessionService {
         sessionExpirationService.expireAbandonedSessions();
 
         Long targetId = resolveCollaboratorId(collaboratorId);
-        if (!collaboratorSecurity.hasAdminOrRhAccess()
-                && !collaboratorSecurity.canAccessCollaborator(targetId)) {
+        if (!access.operatesCompany()
+                && !access.canAccessCollaborator(targetId)) {
             throw new AccessDeniedException("Acesso negado. Você só pode consultar seus próprios horários.");
         }
 
@@ -128,11 +128,15 @@ public class CollaboratorSessionService {
         }
 
         List<CollaboratorSession> busy = sessionRepository
-                .findBySessionDateBetweenAndStatusIn(start, end, ACTIVE_STATUSES);
+                .findByCompanyIdAndSessionDateBetweenAndStatusIn(currentTenant.companyId(), start, end, ACTIVE_STATUSES);
+
+        // Capacidade simultânea da empresa: um horário só fica indisponível quando
+        // as reservas dele igualam o número de cadeiras.
+        int chairs = chairService.countActiveChairs();
 
         List<AvailableDayDTO> days = new ArrayList<>();
         for (LocalDate date = start; !date.isAfter(end); date = date.plusDays(1)) {
-            buildDay(targetId, date, durationMinutes, busy).ifPresent(day -> days.add(day));
+            buildDay(targetId, date, durationMinutes, busy, chairs).ifPresent(day -> days.add(day));
         }
 
         return new AvailableSlotsResponseDTO(start, end, durationMinutes, maxAdvanceDays, days);
@@ -147,7 +151,7 @@ public class CollaboratorSessionService {
      * dia que o colaborador não trabalha.
      */
     private Optional<AvailableDayDTO> buildDay(Long collaboratorId, LocalDate date, int durationMinutes,
-            List<CollaboratorSession> busy) {
+            List<CollaboratorSession> busy, int chairs) {
         Optional<WorkDay> workDay = WorkDay.from(date);
         if (workDay.isEmpty()) {
             return Optional.empty();
@@ -176,7 +180,7 @@ public class CollaboratorSessionService {
             // tomado por outra pessoa.
             if (!hasPassed(slotStart, date)) {
                 slots.add(new SessionSlotDTO(slotStart, slotEnd,
-                        isFree(slotStart, slotEnd, busyOnDate)));
+                        isFree(slotStart, slotEnd, busyOnDate, chairs)));
             }
             slotStart = slotEnd;
             slotEnd = slotStart.plusMinutes(durationMinutes);
@@ -190,7 +194,9 @@ public class CollaboratorSessionService {
 
     @Transactional
     public CollaboratorSessionResponseDTO create(CollaboratorSessionDTO dto) {
-        Collaborator collaborator = collaboratorRepository.findById(Objects.requireNonNull(dto.collaboratorId()))
+        // Escopado: agendar para um colaborador de outra empresa responde 404.
+        Collaborator collaborator = collaboratorRepository
+                .findByIdScoped(Objects.requireNonNull(dto.collaboratorId()))
                 .orElseThrow(() -> new ResourceNotFoundException("Colaborador não encontrado"));
 
         // Sem isto, uma sessão abandonada continuaria bloqueando o horário e o
@@ -204,6 +210,9 @@ public class CollaboratorSessionService {
         requireSlotFree(dto.sessionDate(), dto.startTime(), endTime, null);
 
         CollaboratorSession session = new CollaboratorSession();
+        // A empresa vem do colaborador, não do contexto: assim a sessão nunca pode
+        // acabar em um tenant diferente do dono dela, nem que o contexto esteja errado.
+        session.setCompany(collaborator.getCompany());
         session.setCollaborator(collaborator);
         session.setSessionDate(dto.sessionDate());
         session.setStartTime(dto.startTime());
@@ -315,11 +324,7 @@ public class CollaboratorSessionService {
 
     /** Só faz sentido para colaborador: ADMIN e RH não têm sessão própria. */
     private Long requireLoggedCollaboratorId() {
-        var authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !(authentication.getPrincipal() instanceof Collaborator logged)) {
-            throw new AccessDeniedException("Rota disponível apenas para colaboradores autenticados");
-        }
-        return logged.getId();
+        return Principals.requireCollaborator().getId();
     }
 
     @Transactional
@@ -358,26 +363,42 @@ public class CollaboratorSessionService {
     }
 
     private CollaboratorSession findEntityById(Long id) {
-        CollaboratorSession session = sessionRepository.findById(Objects.requireNonNull(id))
+        CollaboratorSession session = sessionRepository.findByIdScoped(Objects.requireNonNull(id))
                 .orElseThrow(() -> new ResourceNotFoundException("Sessão não encontrada"));
-        if (!collaboratorSecurity.hasAdminOrRhAccess()
-                && !collaboratorSecurity.canAccessCollaborator(session.getCollaborator().getId())) {
+        if (!access.operatesCompany()
+                && !access.canAccessCollaborator(session.getCollaborator().getId())) {
             throw new AccessDeniedException("Acesso negado. Você só pode acessar suas próprias sessões.");
         }
         return session;
     }
 
     /**
-     * Checa antes de inserir o que o índice {@code uq_collaborator_active_session}
-     * garante no banco — assim o cliente recebe 400 com explicação em vez de 500
-     * por violação de constraint.
+     * O horário só está cheio quando as sessões simultâneas igualam o número de
+     * cadeiras da empresa.
+     *
+     * <p>
+     * Antes qualquer sobreposição era conflito, porque havia um recurso só. Com
+     * várias cadeiras isso passou a recusar agendamento por nada: duas pessoas
+     * podem descansar às 12:00 se existirem duas cadeiras.
+     *
+     * <p>
+     * A checagem aqui é para o cliente receber 400 com explicação; quem garante de
+     * fato é o {@code EXCLUDE uq_session_no_overlap}, que impede duas sessões
+     * ativas na <em>mesma</em> cadeira — a checagem da aplicação roda antes do
+     * commit e, em dois agendamentos simultâneos, os dois passariam.
      */
-    /** Recurso único de atendimento: duas sessões ativas não podem se sobrepor. */
     private void requireSlotFree(LocalDate sessionDate, LocalTime startTime, LocalTime endTime, Long excludeId) {
-        if (sessionRepository.existsOverlapping(sessionDate, ACTIVE_STATUSES,
-                excludeId != null ? excludeId : -1L, startTime, endTime)) {
-            throw new BusinessException("Já existe uma sessão agendada entre " + startTime + " e " + endTime
-                    + " em " + sessionDate + ". Escolha outro horário.");
+        int chairs = chairService.countActiveChairs();
+        if (chairs == 0) {
+            throw new BusinessException("Nenhuma cadeira cadastrada para esta empresa. Procure o RH.");
+        }
+
+        long busy = sessionRepository.countOverlapping(currentTenant.companyId(), sessionDate, ACTIVE_STATUSES,
+                excludeId != null ? excludeId : -1L, startTime, endTime);
+
+        if (busy >= chairs) {
+            throw new BusinessException("Todas as cadeiras já estão reservadas entre " + startTime + " e "
+                    + endTime + " em " + sessionDate + ". Escolha outro horário.");
         }
     }
 
@@ -454,9 +475,9 @@ public class CollaboratorSessionService {
         if (collaboratorId != null) {
             return collaboratorId;
         }
-        var authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication != null && authentication.getPrincipal() instanceof Collaborator logged) {
-            return logged.getId();
+        Optional<Collaborator> logged = Principals.collaborator();
+        if (logged.isPresent()) {
+            return logged.get().getId();
         }
         throw new BusinessException("Informe o parâmetro collaboratorId");
     }
@@ -467,9 +488,20 @@ public class CollaboratorSessionService {
     }
 
     /** Livre quando nenhuma sessão ativa se sobrepõe ao intervalo. */
-    private boolean isFree(LocalTime slotStart, LocalTime slotEnd, List<CollaboratorSession> busy) {
-        return busy.stream().noneMatch(
-                session -> session.getStartTime().isBefore(slotEnd) && session.getEndTime().isAfter(slotStart));
+    /**
+     * Livre enquanto sobrar cadeira no horário.
+     *
+     * <p>
+     * Deixou de ser "ninguém marcou" e passou a ser contagem quando uma empresa
+     * pôde ter várias cadeiras — com duas, o segundo agendamento das 12:00 é
+     * legítimo, e recusá-lo desperdiçaria metade do parque.
+     */
+    private boolean isFree(LocalTime slotStart, LocalTime slotEnd, List<CollaboratorSession> busy, int chairs) {
+        long overlapping = busy.stream()
+                .filter(session -> session.getStartTime().isBefore(slotEnd)
+                        && session.getEndTime().isAfter(slotStart))
+                .count();
+        return overlapping < chairs;
     }
 
     private CollaboratorWorkSchedule requireAllowedWindow(Long collaboratorId, LocalDate sessionDate) {

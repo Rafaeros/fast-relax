@@ -74,6 +74,12 @@
 			<artifactId>spring-boot-starter-validation</artifactId>
 		</dependency>
 
+		<!-- E-MAIL (convite de primeiro acesso e recuperação de senha) -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-mail</artifactId>
+		</dependency>
+
 		<!-- FLYWAY -->
 		<dependency>
 			<groupId>org.flywaydb</groupId>

@@ -1,14 +1,16 @@
 package br.rafaeros.fastrelax_api.features.users.dtos;
 
+import br.rafaeros.fastrelax_api.core.dto.CredentialDeliveryDTO;
+
 /**
  * Resposta do cadastro de usuário.
  *
  * <p>
- * {@code temporaryPassword} aparece <strong>somente aqui</strong>: é gerada, exibida
- * uma vez e guardada apenas como hash. Se o ADMIN perder o valor, não há como
- * recuperá-lo — só redefinir.
+ * {@code credential} diz como o acesso foi entregue: convite por e-mail ou
+ * senha temporária. Quando é senha, ela aparece <strong>somente aqui</strong> —
+ * o banco guarda apenas o hash, e perder o valor significa ter de redefinir.
  */
 public record CreatedUserResponseDTO(
     UserResponseDTO user,
-    String temporaryPassword
+    CredentialDeliveryDTO credential
 ) {}
