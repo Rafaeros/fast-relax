@@ -15,10 +15,12 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import br.rafaeros.fastrelax_api.core.security.Principals;
-import br.rafaeros.fastrelax_api.core.security.AccessGuard;
 import br.rafaeros.fastrelax_api.core.exceptions.BusinessException;
 import br.rafaeros.fastrelax_api.core.exceptions.ResourceNotFoundException;
+import br.rafaeros.fastrelax_api.core.security.AccessGuard;
+import br.rafaeros.fastrelax_api.core.security.Principals;
+import br.rafaeros.fastrelax_api.features.chairs.Chair;
+import br.rafaeros.fastrelax_api.features.chairs.dtos.ChairResponseDTO;
 import br.rafaeros.fastrelax_api.features.collaborators.dtos.AvailableDayDTO;
 import br.rafaeros.fastrelax_api.features.collaborators.dtos.AvailableSlotsResponseDTO;
 import br.rafaeros.fastrelax_api.features.collaborators.dtos.CollaboratorSessionDTO;
@@ -32,13 +34,12 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class CollaboratorSessionService {
 
-    private static final List<SessionStatus> ACTIVE_STATUSES =
-            List.of(SessionStatus.SCHEDULED, SessionStatus.STARTED);
+    private static final List<SessionStatus> ACTIVE_STATUSES = List.of(SessionStatus.SCHEDULED, SessionStatus.STARTED);
 
-    private static final java.time.format.DateTimeFormatter DATE_FORMAT =
-            java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy");
-    private static final java.time.format.DateTimeFormatter TIME_FORMAT =
-            java.time.format.DateTimeFormatter.ofPattern("HH:mm");
+    private static final java.time.format.DateTimeFormatter DATE_FORMAT = java.time.format.DateTimeFormatter
+            .ofPattern("dd/MM/yyyy");
+    private static final java.time.format.DateTimeFormatter TIME_FORMAT = java.time.format.DateTimeFormatter
+            .ofPattern("HH:mm");
 
     private final CollaboratorSessionRepository sessionRepository;
     private final CollaboratorRepository collaboratorRepository;
@@ -84,7 +85,8 @@ public class CollaboratorSessionService {
      * @return vazio quando não há nada agendado ou em andamento
      */
     public Optional<CollaboratorSessionResponseDTO> findMyCurrentSession() {
-        // Expira antes de responder: uma sessão abandonada não deve aparecer como ativa.
+        // Expira antes de responder: uma sessão abandonada não deve aparecer como
+        // ativa.
         sessionExpirationService.expireAbandonedSessions();
 
         Long collaboratorId = resolveCollaboratorId(null);
@@ -97,12 +99,14 @@ public class CollaboratorSessionService {
      * colaborador pode escolher sem precisar consultar dia a dia.
      *
      * <p>
-     * Dias sem janela de horário permitido e dias lotados não entram no resultado, então a
+     * Dias sem janela de horário permitido e dias lotados não entram no resultado,
+     * então a
      * lista devolvida já é exatamente o que pode ser selecionado.
      *
      * @param collaboratorId opcional para colaborador logado — assume o próprio id
      * @param from           opcional — assume hoje
-     * @param to             opcional — assume {@code from} mais a antecedência máxima
+     * @param to             opcional — assume {@code from} mais a antecedência
+     *                       máxima
      */
     public AvailableSlotsResponseDTO findAvailableSlots(Long collaboratorId, LocalDate from, LocalDate to) {
         // Libera os horários de sessões abandonadas antes de calcular a grade.
@@ -128,7 +132,8 @@ public class CollaboratorSessionService {
         }
 
         List<CollaboratorSession> busy = sessionRepository
-                .findByCompanyIdAndSessionDateBetweenAndStatusIn(currentTenant.companyId(), start, end, ACTIVE_STATUSES);
+                .findByCompanyIdAndSessionDateBetweenAndStatusIn(currentTenant.companyId(), start, end,
+                        ACTIVE_STATUSES);
 
         // Capacidade simultânea da empresa: um horário só fica indisponível quando
         // as reservas dele igualam o número de cadeiras.
@@ -147,7 +152,8 @@ public class CollaboratorSessionService {
      * {@code available = false}, para a tela poder exibi-los desabilitados.
      *
      * <p>
-     * Vazio apenas quando o dia não tem janela de horário permitido configurada — domingo ou
+     * Vazio apenas quando o dia não tem janela de horário permitido configurada —
+     * domingo ou
      * dia que o colaborador não trabalha.
      */
     private Optional<AvailableDayDTO> buildDay(Long collaboratorId, LocalDate date, int durationMinutes,
@@ -171,7 +177,8 @@ public class CollaboratorSessionService {
         LocalTime slotStart = window.getAllowedStartTime();
         LocalTime slotEnd = slotStart.plusMinutes(durationMinutes);
 
-        // Para enquanto o slot inteiro couber na janela permitida; o teste de isAfter também
+        // Para enquanto o slot inteiro couber na janela permitida; o teste de isAfter
+        // também
         // encerra o laço se a soma cruzar a meia-noite.
         while (!slotEnd.isAfter(window.getAllowedEndTime()) && slotEnd.isAfter(slotStart)) {
             // Horário que já passou some da grade em vez de aparecer desabilitado:
@@ -199,6 +206,12 @@ public class CollaboratorSessionService {
                 .findByIdScoped(Objects.requireNonNull(dto.collaboratorId()))
                 .orElseThrow(() -> new ResourceNotFoundException("Colaborador não encontrado"));
 
+        ChairResponseDTO chair = chairService.findById(dto.chairId());
+
+
+        if (!chair.companyId().equals(collaborator.getCompany().getId())) {
+            throw new BusinessException("A cadeira não pertence à empresa do colaborador");
+        }
         // Sem isto, uma sessão abandonada continuaria bloqueando o horário e o
         // próprio colaborador pelo índice de sessão ativa única.
         sessionExpirationService.expireAbandonedSessions();
@@ -225,7 +238,9 @@ public class CollaboratorSessionService {
         return new CollaboratorSessionResponseDTO(saved);
     }
 
-    /** Reagenda uma sessão que ainda não começou. Não muda de estado nem de dono. */
+    /**
+     * Reagenda uma sessão que ainda não começou. Não muda de estado nem de dono.
+     */
     @Transactional
     public CollaboratorSessionResponseDTO update(Long id, CollaboratorSessionDTO dto) {
         CollaboratorSession session = findEntityById(Objects.requireNonNull(id));
@@ -482,7 +497,9 @@ public class CollaboratorSessionService {
         throw new BusinessException("Informe o parâmetro collaboratorId");
     }
 
-    /** Horário do passado, contado só no dia de hoje — datas futuras nunca passaram. */
+    /**
+     * Horário do passado, contado só no dia de hoje — datas futuras nunca passaram.
+     */
     private boolean hasPassed(LocalTime slotStart, LocalDate sessionDate) {
         return sessionDate.isEqual(LocalDate.now()) && !slotStart.isAfter(LocalTime.now());
     }
@@ -515,7 +532,8 @@ public class CollaboratorSessionService {
     }
 
     /**
-     * A sessão precisa caber inteira na janela de horário permitido configurada para aquele
+     * A sessão precisa caber inteira na janela de horário permitido configurada
+     * para aquele
      * dia da semana — é a razão de {@code CollaboratorWorkSchedule} existir.
      */
     private void validateWithinAllowedWindow(Long collaboratorId, LocalDate sessionDate, LocalTime startTime,

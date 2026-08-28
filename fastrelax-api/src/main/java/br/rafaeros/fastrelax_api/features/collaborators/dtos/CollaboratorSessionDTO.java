@@ -20,6 +20,9 @@ public record CollaboratorSessionDTO(
     @NotNull(message = "O colaborador é obrigatório")
     Long collaboratorId,
 
+    @NotNull(message = "A cadeira é obrigatória")
+    Long chairId,
+
     @NotNull(message = "A data da sessão é obrigatória")
     LocalDate sessionDate,
 
