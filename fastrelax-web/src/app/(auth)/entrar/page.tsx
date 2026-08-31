@@ -24,10 +24,10 @@ export default async function LoginPage({
   if (user) redirect("/painel");
 
   return (
-    <div className="grid min-h-dvh lg:grid-cols-2">
+    <div className="grid min-h-dvh lg:h-dvh lg:grid-cols-2 lg:overflow-hidden">
       <LoginBrandPanel />
 
-      <main className="flex flex-col justify-center px-5 py-12 sm:px-10">
+      <main className="flex flex-col justify-center px-5 py-12 sm:px-10 lg:h-full lg:overflow-y-auto">
         <div className="mx-auto flex w-full max-w-md flex-col gap-8">
           <div className="flex items-center justify-between">
             <Logo priority />

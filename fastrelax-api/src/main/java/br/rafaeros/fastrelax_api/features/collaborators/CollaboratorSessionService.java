@@ -21,6 +21,7 @@ import br.rafaeros.fastrelax_api.core.security.AccessGuard;
 import br.rafaeros.fastrelax_api.core.security.Principals;
 import br.rafaeros.fastrelax_api.features.chairs.Chair;
 import br.rafaeros.fastrelax_api.features.chairs.dtos.ChairResponseDTO;
+import br.rafaeros.fastrelax_api.features.collaborators.dtos.AvailableChairDTO;
 import br.rafaeros.fastrelax_api.features.collaborators.dtos.AvailableDayDTO;
 import br.rafaeros.fastrelax_api.features.collaborators.dtos.AvailableSlotsResponseDTO;
 import br.rafaeros.fastrelax_api.features.collaborators.dtos.CollaboratorSessionDTO;
@@ -49,6 +50,7 @@ public class CollaboratorSessionService {
     private final SessionExpirationService sessionExpirationService;
     private final br.rafaeros.fastrelax_api.features.chairs.ChairCommandService chairCommandService;
     private final br.rafaeros.fastrelax_api.features.chairs.ChairService chairService;
+    private final br.rafaeros.fastrelax_api.features.chairs.ChairRepository chairRepository;
     private final org.springframework.context.ApplicationEventPublisher events;
     private final br.rafaeros.fastrelax_api.core.tenancy.CurrentTenant currentTenant;
 
@@ -137,11 +139,13 @@ public class CollaboratorSessionService {
 
         // Capacidade simultânea da empresa: um horário só fica indisponível quando
         // as reservas dele igualam o número de cadeiras.
-        int chairs = chairService.countActiveChairs();
+        List<AvailableChairDTO> activeChairs = chairService.listActiveChairs().stream()
+                .map(AvailableChairDTO::new)
+                .toList();
 
         List<AvailableDayDTO> days = new ArrayList<>();
         for (LocalDate date = start; !date.isAfter(end); date = date.plusDays(1)) {
-            buildDay(targetId, date, durationMinutes, busy, chairs).ifPresent(day -> days.add(day));
+            buildDay(targetId, date, durationMinutes, busy, activeChairs).ifPresent(day -> days.add(day));
         }
 
         return new AvailableSlotsResponseDTO(start, end, durationMinutes, maxAdvanceDays, days);
@@ -157,7 +161,7 @@ public class CollaboratorSessionService {
      * dia que o colaborador não trabalha.
      */
     private Optional<AvailableDayDTO> buildDay(Long collaboratorId, LocalDate date, int durationMinutes,
-            List<CollaboratorSession> busy, int chairs) {
+            List<CollaboratorSession> busy, List<AvailableChairDTO> activeChairs) {
         Optional<WorkDay> workDay = WorkDay.from(date);
         if (workDay.isEmpty()) {
             return Optional.empty();
@@ -187,7 +191,7 @@ public class CollaboratorSessionService {
             // tomado por outra pessoa.
             if (!hasPassed(slotStart, date)) {
                 slots.add(new SessionSlotDTO(slotStart, slotEnd,
-                        isFree(slotStart, slotEnd, busyOnDate, chairs)));
+                        getAvailableChairs(slotStart, slotEnd, busyOnDate, activeChairs)));
             }
             slotStart = slotEnd;
             slotEnd = slotStart.plusMinutes(durationMinutes);
@@ -206,12 +210,9 @@ public class CollaboratorSessionService {
                 .findByIdScoped(Objects.requireNonNull(dto.collaboratorId()))
                 .orElseThrow(() -> new ResourceNotFoundException("Colaborador não encontrado"));
 
-        ChairResponseDTO chair = chairService.findById(dto.chairId());
+        Chair chair = chairRepository.findByIdScoped(dto.chairId())
+                .orElseThrow(() -> new BusinessException("Cadeira não encontrada ou não pertence à sua empresa"));
 
-
-        if (!chair.companyId().equals(collaborator.getCompany().getId())) {
-            throw new BusinessException("A cadeira não pertence à empresa do colaborador");
-        }
         // Sem isto, uma sessão abandonada continuaria bloqueando o horário e o
         // próprio colaborador pelo índice de sessão ativa única.
         sessionExpirationService.expireAbandonedSessions();
@@ -230,6 +231,7 @@ public class CollaboratorSessionService {
         session.setSessionDate(dto.sessionDate());
         session.setStartTime(dto.startTime());
         session.setEndTime(endTime);
+        session.setChair(chair);
         // O status nunca vem do cliente: toda sessão nasce agendada.
         session.setStatus(SessionStatus.SCHEDULED);
 
@@ -513,12 +515,18 @@ public class CollaboratorSessionService {
      * pôde ter várias cadeiras — com duas, o segundo agendamento das 12:00 é
      * legítimo, e recusá-lo desperdiçaria metade do parque.
      */
-    private boolean isFree(LocalTime slotStart, LocalTime slotEnd, List<CollaboratorSession> busy, int chairs) {
-        long overlapping = busy.stream()
-                .filter(session -> session.getStartTime().isBefore(slotEnd)
-                        && session.getEndTime().isAfter(slotStart))
-                .count();
-        return overlapping < chairs;
+    private List<AvailableChairDTO> getAvailableChairs(LocalTime start, LocalTime end, List<CollaboratorSession> busy,
+            List<AvailableChairDTO> activeChairs) {
+        List<AvailableChairDTO> availableChairs = new ArrayList<>(activeChairs);
+        for (CollaboratorSession session : busy) {
+            // Se a sessão conflita com o slot
+            if (session.getStartTime().isBefore(end) && session.getEndTime().isAfter(start)) {
+                if (session.getChair() != null) {
+                    availableChairs.removeIf(c -> c.id().equals(session.getChair().getId()));
+                }
+            }
+        }
+        return availableChairs;
     }
 
     private CollaboratorWorkSchedule requireAllowedWindow(Long collaboratorId, LocalDate sessionDate) {

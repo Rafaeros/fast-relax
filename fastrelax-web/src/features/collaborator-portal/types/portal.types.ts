@@ -91,7 +91,7 @@ export type CollaboratorSession = {
 export type SessionSlot = {
   startTime: string;
   endTime: string;
-  available: boolean;
+  availableChairs: { id: number; name: string }[];
 };
 
 /** Espelha `AvailableDayDTO`. */
@@ -122,6 +122,7 @@ export type ListMySessionsParams = PageParams & {
 /** Espelha `CollaboratorSessionDTO` — sem `endTime`, calculado pelo backend. */
 export type BookSessionInput = {
   collaboratorId: number;
+  chairId: number;
   sessionDate: string;
   startTime: string;
 };

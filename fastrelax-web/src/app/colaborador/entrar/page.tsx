@@ -33,7 +33,7 @@ export default async function CollaboratorLoginPage({
   return (
     // Duas colunas a partir de lg, igual ao login do painel: no celular sobra
     // só o formulário, que é como a maioria dos colaboradores entra.
-    <div className="grid min-h-dvh lg:grid-cols-2">
+    <div className="grid min-h-dvh lg:h-dvh lg:grid-cols-2 lg:overflow-hidden">
       <LoginBrandPanel
         eyebrow="Área do colaborador"
         title={
@@ -48,7 +48,7 @@ export default async function CollaboratorLoginPage({
       />
 
       <main
-        className="flex flex-col justify-center px-5 py-12 sm:px-10"
+        className="flex flex-col justify-center px-5 py-12 sm:px-10 lg:h-full lg:overflow-y-auto"
         style={{ paddingTop: "calc(env(safe-area-inset-top) + 3rem)" }}
       >
         <div className="mx-auto flex w-full max-w-md flex-col gap-8">

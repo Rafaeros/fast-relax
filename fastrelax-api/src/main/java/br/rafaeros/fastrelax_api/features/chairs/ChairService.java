@@ -204,6 +204,10 @@ public class ChairService {
         return chairRepository.findByCompanyIdAndActiveTrue(currentTenant.companyId()).size();
     }
 
+    public List<Chair> listActiveChairs() {
+        return chairRepository.findByCompanyIdAndActiveTrue(currentTenant.companyId());
+    }
+
     /**
      * Cadeira livre para atender uma sessão, entre as da empresa.
      *

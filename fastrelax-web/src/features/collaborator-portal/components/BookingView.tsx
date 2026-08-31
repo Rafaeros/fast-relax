@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Button, Card, Icon, useToast } from "@/components/ui";
+import { Button, Card, Icon, Modal, useToast } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { bookSessionAction } from "@/features/collaborator-portal/actions/portal.actions";
 import { formatTime, isToday, parseApiDate } from "@/features/collaborator-portal/lib/format";
-import type { AvailableSlots } from "@/features/collaborator-portal/types/portal.types";
+import type { AvailableSlots, SessionSlot } from "@/features/collaborator-portal/types/portal.types";
 
 export type BookingViewProps = {
   collaboratorId: number;
@@ -23,18 +23,29 @@ const WEEKDAY_SHORT = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
  */
 export function BookingView({ collaboratorId, slots }: BookingViewProps) {
   const [selectedDate, setSelectedDate] = useState(slots.days[0]?.sessionDate ?? "");
+  const [selectedSlot, setSelectedSlot] = useState<SessionSlot | null>(null);
+  const [selectedChairId, setSelectedChairId] = useState<number | null>(null);
   const [pending, startTransition] = useTransition();
   const { success, error } = useToast();
 
   const selectedDay = slots.days.find((day) => day.sessionDate === selectedDate);
 
-  const book = (startTime: string) => {
+  const book = () => {
+    if (!selectedSlot || !selectedChairId) return;
+
     startTransition(async () => {
-      const result = await bookSessionAction(collaboratorId, selectedDate, startTime);
+      const result = await bookSessionAction(
+        collaboratorId,
+        selectedChairId,
+        selectedDate,
+        selectedSlot.startTime
+      );
       // Resposta do servidor vai para o toast: a grade recarrega abaixo e um
       // aviso empurrando os horários mudaria o alvo do toque no meio da ação.
       if (result.ok) {
         success(result.message);
+        setSelectedSlot(null);
+        setSelectedChairId(null);
       } else {
         error(result.message);
       }
@@ -71,7 +82,7 @@ export function BookingView({ collaboratorId, slots }: BookingViewProps) {
           {slots.days.map((day) => {
             const date = parseApiDate(day.sessionDate);
             const active = day.sessionDate === selectedDate;
-            const free = day.slots.filter((slot) => slot.available).length;
+            const free = day.slots.filter((slot) => slot.availableChairs.length > 0).length;
 
             return (
               <li key={day.sessionDate} className="snap-start">
@@ -117,26 +128,34 @@ export function BookingView({ collaboratorId, slots }: BookingViewProps) {
         {selectedDay && (
           // Grade fluida: três colunas no celular, mais conforme a tela cresce.
           <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
-            {selectedDay.slots.map((slot) => (
-              <li key={slot.startTime}>
-                <button
-                  type="button"
-                  disabled={!slot.available || pending}
-                  onClick={() => book(slot.startTime)}
-                  className={cn(
-                    "flex min-h-11 w-full items-center justify-center rounded-control border px-1 text-sm font-medium tabular-nums",
-                    "focus-visible:outline-none focus-visible:shadow-focus",
-                    slot.available
-                      ? "border-accent/40 bg-accent/10 text-ink-primary hover:border-accent hover:bg-accent/20"
-                      : // Ocupado permanece visível para o colaborador ver que o
-                        // horário existe e já foi tomado.
-                        "cursor-not-allowed border-line bg-surface-hover/30 text-ink-muted line-through",
-                  )}
-                >
-                  {formatTime(slot.startTime)}
-                </button>
-              </li>
-            ))}
+            {selectedDay.slots.map((slot) => {
+              const available = slot.availableChairs.length > 0;
+              return (
+                <li key={slot.startTime}>
+                  <button
+                    type="button"
+                    disabled={!available || pending}
+                    onClick={() => {
+                      setSelectedSlot(slot);
+                      setSelectedChairId(
+                        slot.availableChairs.length === 1 ? slot.availableChairs[0].id : null
+                      );
+                    }}
+                    className={cn(
+                      "flex min-h-11 w-full items-center justify-center rounded-control border px-1 text-sm font-medium tabular-nums",
+                      "focus-visible:outline-none focus-visible:shadow-focus",
+                      available
+                        ? "border-accent/40 bg-accent/10 text-ink-primary hover:border-accent hover:bg-accent/20"
+                        : // Ocupado permanece visível para o colaborador ver que o
+                          // horário existe e já foi tomado.
+                          "cursor-not-allowed border-line bg-surface-hover/30 text-ink-muted line-through",
+                    )}
+                  >
+                    {formatTime(slot.startTime)}
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         )}
 
@@ -146,10 +165,66 @@ export function BookingView({ collaboratorId, slots }: BookingViewProps) {
         </p>
       </Card>
 
-      {pending && (
+      {pending && !selectedSlot && (
         <Button size="md" fullWidth disabled leadingIcon={<Icon name="loader" className="h-4 w-4 animate-spin" />}>
           Agendando...
         </Button>
+      )}
+
+      {selectedSlot && (
+        <Modal
+          open={true}
+          onClose={() => {
+            if (!pending) setSelectedSlot(null);
+          }}
+          title="Escolha a cadeira"
+          description={`Para o horário das ${formatTime(selectedSlot.startTime)}`}
+          dismissible={!pending}
+          footer={
+            <div className="flex w-full gap-3">
+              <Button
+                variant="ghost"
+                fullWidth
+                disabled={pending}
+                onClick={() => setSelectedSlot(null)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                variant="primary"
+                fullWidth
+                disabled={!selectedChairId || pending}
+                onClick={book}
+                leadingIcon={pending ? <Icon name="loader" className="h-4 w-4 animate-spin" /> : undefined}
+              >
+                {pending ? "Agendando..." : "Confirmar"}
+              </Button>
+            </div>
+          }
+        >
+          <div className="flex flex-col gap-2 py-4">
+            {selectedSlot.availableChairs.map((chair) => (
+              <button
+                key={chair.id}
+                type="button"
+                disabled={pending}
+                onClick={() => setSelectedChairId(chair.id)}
+                className={cn(
+                  "flex items-center justify-between rounded-control border p-4 text-left transition-colors",
+                  "focus-visible:outline-none focus-visible:shadow-focus",
+                  selectedChairId === chair.id
+                    ? "border-accent bg-accent/5 ring-1 ring-accent"
+                    : "border-line bg-surface hover:border-accent/50",
+                )}
+              >
+                <span className="font-medium text-ink-primary">{chair.name}</span>
+                {selectedChairId === chair.id && (
+                  <Icon name="check" className="h-5 w-5 text-accent" />
+                )}
+              </button>
+            ))}
+          </div>
+        </Modal>
       )}
     </div>
   );

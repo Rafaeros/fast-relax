@@ -133,10 +133,11 @@ export async function collaboratorChangePasswordAction(
 /** Agenda a sessão no horário escolhido na grade. */
 export async function bookSessionAction(
   collaboratorId: number,
+  chairId: number,
   sessionDate: string,
   startTime: string,
 ): Promise<PortalActionResult> {
-  const result = await bookSession({ collaboratorId, sessionDate, startTime });
+  const result = await bookSession({ collaboratorId, chairId, sessionDate, startTime });
 
   if (result.ok) {
     // A grade e o cartão da home mudam juntos: o horário sai de disponível e
