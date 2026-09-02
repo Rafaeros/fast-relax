@@ -174,6 +174,14 @@ export const PANEL_NAV: PanelNavItem[] = [
     roles: COMPANY_ROLES,
     icon: "clock",
   },
+  {
+    section: "Configurações",
+    label: "Minha empresa",
+    description: "Dados cadastrais e o slug que os colaboradores usam no login.",
+    href: "/painel/minha-empresa" as Route,
+    roles: COMPANY_ROLES,
+    icon: "building",
+  },
 ];
 
 /** O que este papel enxerga na sidebar e na barra de abas. */

@@ -110,17 +110,23 @@ public class ChairController {
                 "Relé acionado por " + durationSeconds + "s. Verifique a cadeira."));
     }
 
+    /**
+     * Ativar/desativar é decisão da Physical, não do cliente: reflete o contrato
+     * comercial (equipamento pago, inadimplência, manutenção), não algo que o RH
+     * decida sobre o próprio parque.
+     */
     @PatchMapping("/{id}/toggle-active")
-    @PreAuthorize("@access.operatesCompany()")
-    @Operation(summary = "Ativa ou desativa uma cadeira")
+    @PreAuthorize("@access.isPlatformTeam()")
+    @Operation(summary = "Ativa ou desativa uma cadeira (somente Physical)")
     public ResponseEntity<ApiResponseDTO<ChairResponseDTO>> toggleActive(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponseDTO.success(chairService.toggleActive(id),
                 "Status da cadeira alterado com sucesso"));
     }
 
+    /** Mesma razão do toggle: remover equipamento do parque é decisão da Physical. */
     @DeleteMapping("/{id}")
-    @PreAuthorize("@access.operatesCompany()")
-    @Operation(summary = "Remove uma cadeira (soft delete)")
+    @PreAuthorize("@access.isPlatformTeam()")
+    @Operation(summary = "Remove uma cadeira (soft delete, somente Physical)")
     public ResponseEntity<ApiResponseDTO<Void>> delete(@PathVariable Long id) {
         chairService.softDelete(id);
         return ResponseEntity.ok(ApiResponseDTO.success("Cadeira removida com sucesso"));

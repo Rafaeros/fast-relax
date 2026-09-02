@@ -181,6 +181,7 @@ const PATHS = {
   menu: <path d="M4 7h16M4 12h16M4 17h16" />,
   close: <path d="M6 6l12 12M18 6 6 18" />,
   check: <path d="m5 13 4 4 10-10" />,
+  plus: <path d="M12 5v14M5 12h14" />,
   leaf: (
     <>
       <path d="M20 4C10 4 4 9 4 16c0 2 1 4 1 4s2-9 15-12z" />

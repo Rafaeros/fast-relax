@@ -8,6 +8,8 @@ import br.rafaeros.fastrelax_api.features.locations.Address;
 public record CompanyResponseDTO(
     Long id,
     String cnpj,
+    /** O que o colaborador digita na tela de login em vez do CNPJ. */
+    String slug,
     String name,
     String email,
     String phone,
@@ -36,7 +38,7 @@ public record CompanyResponseDTO(
     LocalDateTime createdAt
 ) {
     public CompanyResponseDTO(Company entity) {
-        this(entity.getId(), entity.getCnpj(), entity.getName(), entity.getEmail(), entity.getPhone(),
+        this(entity.getId(), entity.getCnpj(), entity.getSlug(), entity.getName(), entity.getEmail(), entity.getPhone(),
                 entity.isActive(),
                 id(entity.getAddress()),
                 entity.getAddress() != null ? entity.getAddress().getCep() : null,

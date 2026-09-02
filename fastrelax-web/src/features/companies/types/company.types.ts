@@ -5,6 +5,8 @@ export type Company = {
   id: number;
   /** Só dígitos — a máscara é aplicada na exibição. */
   cnpj: string;
+  /** O que o colaborador digita na tela de login em vez do CNPJ. */
+  slug: string;
   name: string;
   email: string;
   phone: string;
@@ -55,6 +57,8 @@ export type SaveAddressInput = {
 /** Espelha `SaveCompanyRequestDTO`, usado no cadastro e na edição. */
 export type SaveCompanyInput = {
   cnpj: string;
+  /** Em branco deriva da primeira palavra do nome. */
+  slug?: string;
   name: string;
   email: string;
   phone: string;
@@ -68,6 +72,7 @@ export type SaveCompanyInput = {
 export type CompanyFieldErrors = Partial<
   Record<
     | "cnpj"
+    | "slug"
     | "name"
     | "email"
     | "phone"

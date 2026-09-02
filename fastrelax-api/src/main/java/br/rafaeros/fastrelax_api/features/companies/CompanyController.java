@@ -26,10 +26,14 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 /**
- * Exclusivo da equipe da plataforma — o {@code SecurityConfig} já barra
- * {@code /companies/**} para os demais papéis, e os {@code @PreAuthorize} abaixo
- * repetem a regra junto do caso de uso, para quem lê o controller não depender
- * de lembrar da configuração.
+ * CRUD de empresas é exclusivo da equipe da plataforma — o {@code SecurityConfig}
+ * já barra {@code /companies/**} para os demais papéis, e os
+ * {@code @PreAuthorize} abaixo repetem a regra junto do caso de uso, para quem
+ * lê o controller não depender de lembrar da configuração.
+ *
+ * <p>
+ * A única exceção é {@code /companies/me}: leitura da própria empresa, para o
+ * RH/admin do cliente ver o slug que os colaboradores usam para entrar.
  */
 @RestController
 @RequestMapping("/companies")
@@ -38,6 +42,13 @@ import lombok.RequiredArgsConstructor;
 public class CompanyController {
 
     private final CompanyService companyService;
+
+    @GetMapping("/me")
+    @PreAuthorize("@access.operatesCompany()")
+    @Operation(summary = "Dados da própria empresa, incluindo o slug de login")
+    public ResponseEntity<ApiResponseDTO<CompanyResponseDTO>> getMine() {
+        return ResponseEntity.ok(ApiResponseDTO.success(companyService.findMine(), "Empresa encontrada"));
+    }
 
     @GetMapping
     @PreAuthorize("@access.isPlatformTeam()")

@@ -1,7 +1,6 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { onlyDigits } from "@/lib/format";
 import { validateNewPassword } from "@/features/authentication/lib/password";
 import {
   describeToken,
@@ -52,26 +51,25 @@ export async function requestUserResetAction(
     : { status: "error", message: result.message, email };
 }
 
-/** Recuperação do colaborador: CNPJ da empresa mais o e-mail. */
+/** Recuperação do colaborador: identificador da empresa mais o e-mail. */
 export async function requestCollaboratorResetAction(
   _previousState: RecoveryFormState,
   formData: FormData,
 ): Promise<RecoveryFormState> {
-  // O valor com máscara volta no estado de erro; a API recebe só os dígitos.
-  const typedCnpj = String(formData.get("cnpj") ?? "");
-  const cnpj = onlyDigits(typedCnpj);
+  const typedSlug = String(formData.get("companySlug") ?? "");
+  const companySlug = typedSlug.trim().toLowerCase();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
-  const typed = { cnpj: typedCnpj, email };
+  const typed = { companySlug: typedSlug, email };
 
   const fieldErrors: RecoveryFieldErrors = {};
-  if (cnpj.length !== 14) fieldErrors.cnpj = "Informe os 14 dígitos do CNPJ.";
+  if (!companySlug) fieldErrors.companySlug = "Informe o identificador da empresa.";
   if (!EMAIL_PATTERN.test(email)) fieldErrors.email = "Informe um e-mail válido.";
 
   if (Object.keys(fieldErrors).length > 0) {
     return { status: "error", message: "Confira os campos destacados.", fieldErrors, ...typed };
   }
 
-  const result = await requestCollaboratorReset(cnpj, email);
+  const result = await requestCollaboratorReset(companySlug, email);
 
   return result.ok
     ? { status: "sent", message: result.message }

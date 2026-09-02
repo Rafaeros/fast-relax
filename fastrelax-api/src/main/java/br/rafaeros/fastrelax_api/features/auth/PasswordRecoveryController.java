@@ -49,12 +49,12 @@ public class PasswordRecoveryController {
     }
 
     @PostMapping("/collaborator/forgot")
-    @Operation(summary = "Envia o link de redefinição para um colaborador (CNPJ + e-mail)")
+    @Operation(summary = "Envia o link de redefinição para um colaborador (slug da empresa + e-mail)")
     public ResponseEntity<ApiResponseDTO<Void>> collaboratorForgot(
             @RequestBody @Valid CollaboratorForgotPasswordRequestDTO data,
             HttpServletRequest request) {
         rateLimiter.checkAndRegister(clientKey(request));
-        recoveryService.requestForCollaborator(data.cnpj(), data.email());
+        recoveryService.requestForCollaborator(data.companySlug(), data.email());
 
         return ResponseEntity.ok(
                 ApiResponseDTO.success(PasswordRecoveryService.GENERIC_REQUEST_MESSAGE));

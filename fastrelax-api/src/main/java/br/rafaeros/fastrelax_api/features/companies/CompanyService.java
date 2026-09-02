@@ -10,8 +10,10 @@ import org.springframework.transaction.annotation.Transactional;
 import br.rafaeros.fastrelax_api.core.crypto.CryptoService;
 import br.rafaeros.fastrelax_api.core.exceptions.BusinessException;
 import br.rafaeros.fastrelax_api.core.exceptions.ResourceNotFoundException;
+import br.rafaeros.fastrelax_api.core.tenancy.CurrentTenant;
 import br.rafaeros.fastrelax_api.core.util.CnpjUtils;
 import br.rafaeros.fastrelax_api.core.util.PhoneUtils;
+import br.rafaeros.fastrelax_api.core.util.SlugUtils;
 import br.rafaeros.fastrelax_api.features.companies.dtos.CompanyResponseDTO;
 import br.rafaeros.fastrelax_api.features.companies.dtos.SaveAddressRequestDTO;
 import br.rafaeros.fastrelax_api.features.companies.dtos.SaveCompanyRequestDTO;
@@ -38,6 +40,7 @@ public class CompanyService {
     private final CityRepository cityRepository;
     private final SessionSettingsRepository settingsRepository;
     private final CryptoService cryptoService;
+    private final CurrentTenant currentTenant;
 
     public Page<CompanyResponseDTO> findAll(@org.springframework.lang.NonNull Pageable pageable) {
         return companyRepository.findAll(Objects.requireNonNull(pageable)).map(CompanyResponseDTO::new);
@@ -45,6 +48,11 @@ public class CompanyService {
 
     public CompanyResponseDTO findById(Long id) {
         return new CompanyResponseDTO(findEntityById(id));
+    }
+
+    /** A própria empresa de quem está logado — o que a tela "Minha empresa" do RH mostra. */
+    public CompanyResponseDTO findMine() {
+        return new CompanyResponseDTO(currentTenant.load());
     }
 
     /**
@@ -63,6 +71,7 @@ public class CompanyService {
 
         Company company = new Company();
         company.setCnpj(cnpj);
+        company.setSlug(resolveSlug(dto, null));
         company.setAddress(addressRepository.save(buildAddress(new Address(), dto.address())));
         applyFields(company, dto);
 
@@ -83,10 +92,58 @@ public class CompanyService {
         }
 
         company.setCnpj(cnpj);
+        company.setSlug(resolveSlug(dto, company.getId()));
         buildAddress(company.getAddress(), dto.address());
         applyFields(company, dto);
 
         return new CompanyResponseDTO(companyRepository.save(company));
+    }
+
+    /**
+     * Slug explícito ou derivado do nome.
+     *
+     * <p>
+     * Informado, precisa ser único — quem escolheu o valor decide como
+     * resolver a colisão. Derivado, ganha sufixo numérico sozinho: ninguém
+     * escolheu aquele texto, então não há "seu" valor para preservar diante de
+     * outra empresa que já o tenha.
+     */
+    private String resolveSlug(SaveCompanyRequestDTO dto, Long currentId) {
+        String explicit = dto.slug() == null ? "" : dto.slug().trim();
+
+        if (!explicit.isEmpty()) {
+            if (!SlugUtils.isValid(explicit)) {
+                throw new BusinessException("Slug inválido: use só letras minúsculas, números e hífen");
+            }
+            assertSlugAvailable(explicit, currentId);
+            return explicit;
+        }
+
+        String base = SlugUtils.deriveFromName(dto.name());
+        String candidate = base;
+        int suffix = 2;
+        while (slugTaken(candidate, currentId)) {
+            candidate = base + "-" + suffix++;
+        }
+        return candidate;
+    }
+
+    private boolean slugTaken(String slug, Long currentId) {
+        return companyRepository.findBySlug(slug)
+                .filter(other -> !other.getId().equals(currentId))
+                .isPresent()
+                || companyRepository.existsBySlugIncludingDeleted(slug);
+    }
+
+    /**
+     * O slug é único e a constraint não conhece soft delete — mesma lógica do
+     * CNPJ, mas aqui o valor foi escolhido por alguém, então a resposta pede
+     * para digitar outro em vez de gerar uma variação sozinha.
+     */
+    private void assertSlugAvailable(String slug, Long currentId) {
+        if (slugTaken(slug, currentId)) {
+            throw new BusinessException("Já existe uma empresa cadastrada com este slug");
+        }
     }
 
     /**

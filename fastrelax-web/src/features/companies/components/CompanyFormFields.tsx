@@ -21,8 +21,8 @@ export type CompanyFormFieldsProps = {
  * Campos da empresa, compartilhados entre cadastro e edição.
  *
  * <p>
- * O CNPJ continua editável na edição porque é ele que o colaborador digita no
- * login: um cadastro com o número errado deixa a empresa inteira sem acesso, e
+ * O slug continua editável na edição porque é ele que o colaborador digita no
+ * login: um cadastro com o valor errado deixa a empresa inteira sem acesso, e
  * a correção não pode depender de recriar o tenant.
  */
 export function CompanyFormFields({
@@ -86,7 +86,7 @@ export function CompanyFormFields({
           value={draft.cnpj}
           onValueChange={(digits) => patch({ cnpj: digits })}
           containerClassName="flex-1"
-          hint="É o que os colaboradores informam na tela de login."
+          hint="Identidade fiscal — o login usa o slug, logo abaixo."
           error={fieldErrors.cnpj}
           leadingIcon={<Icon name="building" />}
         />
@@ -119,6 +119,19 @@ export function CompanyFormFields({
         value={draft.name}
         onChange={(event) => patch({ name: event.target.value })}
         error={fieldErrors.name}
+      />
+
+      <Input
+        name="slug"
+        label="Slug (identificador de login)"
+        placeholder="Deixe em branco para gerar a partir do nome"
+        maxLength={60}
+        disabled={disabled}
+        value={draft.slug}
+        onChange={(event) => patch({ slug: event.target.value.toLowerCase() })}
+        hint="É o que os colaboradores informam na tela de login, em vez do CNPJ."
+        error={fieldErrors.slug}
+        leadingIcon={<Icon name="key" />}
       />
 
       <Input

@@ -1,5 +1,6 @@
 package br.rafaeros.fastrelax_api.features.collaborators;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.Query;
@@ -25,13 +26,10 @@ public interface CollaboratorRepository extends CompanyScopedRepository<Collabor
      * tela.
      *
      * <p>
-     * Ignora caixa porque é isso que o índice {@code uq_collaborators_company_email}
-     * garante: "Ana@x.com" e "ana@x.com" são a mesma conta.
+     * E-mail não é mais único dentro da empresa — só o CPF é. Pode haver mais de
+     * um resultado; quem chama decide qual usar (o mais recente entre os ativos).
      */
-    Optional<Collaborator> findByCompanyIdAndEmailIgnoreCase(Long companyId, String email);
-
-    /** Conflito de e-mail dentro da empresa, checado antes de gravar. */
-    Optional<Collaborator> findByCompanyIdAndEmailIgnoreCaseAndIdNot(Long companyId, String email, Long id);
+    List<Collaborator> findByCompanyIdAndEmailIgnoreCaseOrderByCreatedAtDesc(Long companyId, String email);
 
     /**
      * Enxerga também os removidos, para reativar em vez de violar

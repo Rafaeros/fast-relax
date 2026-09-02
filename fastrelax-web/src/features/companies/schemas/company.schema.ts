@@ -9,10 +9,12 @@ export type CompanyValidation =
   | { valid: false; fieldErrors: CompanyFieldErrors };
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
 
 /** Espelha as constraints de `SaveCompanyRequestDTO`. */
 export function validateCompanyInput(input: {
   cnpj: string;
+  slug: string;
   name: string;
   email: string;
   phone: string;
@@ -25,6 +27,8 @@ export function validateCompanyInput(input: {
   wifiPassword: string;
 }): CompanyValidation {
   const cnpj = onlyDigits(input.cnpj);
+  // Vazio é válido: sem slug digitado, o backend deriva da razão social.
+  const slug = input.slug.trim().toLowerCase();
   const name = input.name.trim();
   const email = input.email.trim().toLowerCase();
   const phone = onlyDigits(input.phone);
@@ -47,6 +51,10 @@ export function validateCompanyInput(input: {
     fieldErrors.cnpj = "Informe os 14 dígitos do CNPJ.";
   } else if (!hasValidCnpjCheckDigits(cnpj)) {
     fieldErrors.cnpj = "CNPJ inválido.";
+  }
+
+  if (slug && (slug.length < 2 || slug.length > 60 || !SLUG_PATTERN.test(slug))) {
+    fieldErrors.slug = "Use só letras minúsculas, números e hífen (mínimo 2 caracteres).";
   }
 
   if (name.length < 2 || name.length > 255) {
@@ -101,6 +109,7 @@ export function validateCompanyInput(input: {
     valid: true,
     data: {
       cnpj,
+      slug: slug || undefined,
       name,
       email,
       phone,
@@ -151,6 +160,7 @@ export function mapCompanyApiErrors(errors: string[]): CompanyFieldErrors {
   const fieldErrors: CompanyFieldErrors = {};
   const known: (keyof CompanyFieldErrors)[] = [
     "cnpj",
+    "slug",
     "name",
     "email",
     "phone",

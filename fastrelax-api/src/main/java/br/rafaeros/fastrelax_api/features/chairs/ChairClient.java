@@ -116,6 +116,20 @@ public class ChairClient {
                 "bssid", bssid == null ? "" : bssid));
     }
 
+    /**
+     * Liga/desliga o relé de corte de energia do painel, conforme o {@code
+     * active} do cadastro da cadeira.
+     *
+     * <p>
+     * Best-effort: se a cadeira estiver offline agora, este envio falha e quem
+     * chamou não deve tratar isso como erro do toggle — o próximo heartbeat
+     * que o ESP32 conseguir mandar já reconcilia sozinho, lendo o mesmo campo
+     * {@code active} que volta na resposta.
+     */
+    public ChairCommandResult pushPower(Chair chair, boolean active) {
+        return send(chair, "/power", Map.of("active", active));
+    }
+
     private ChairCommandResult send(Chair chair, String path, Map<String, Object> body) {
         if (chair.getIpAddress() == null) {
             log.warn("Cadeira {} sem IP conhecido; comando {} não enviado", chair.getName(), path);

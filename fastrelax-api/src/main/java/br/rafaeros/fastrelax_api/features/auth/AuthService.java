@@ -11,8 +11,8 @@ import br.rafaeros.fastrelax_api.core.exceptions.BusinessException;
 import br.rafaeros.fastrelax_api.core.security.CredentialService;
 import br.rafaeros.fastrelax_api.core.security.LoginRateLimiter;
 import br.rafaeros.fastrelax_api.core.security.TokenService;
-import br.rafaeros.fastrelax_api.core.util.CnpjUtils;
 import br.rafaeros.fastrelax_api.core.util.CpfUtils;
+import br.rafaeros.fastrelax_api.core.util.SlugUtils;
 import br.rafaeros.fastrelax_api.features.collaborators.Collaborator;
 import br.rafaeros.fastrelax_api.features.collaborators.CollaboratorRepository;
 import br.rafaeros.fastrelax_api.features.companies.Company;
@@ -33,7 +33,7 @@ public class AuthService {
      * desativado dizem exatamente a mesma coisa. Diferenciá-los seria entregar,
      * de graça, quem é cliente da Physical e quem trabalha em cada cliente.
      */
-    private static final String INVALID_CREDENTIALS = "CNPJ, CPF ou senha inválidos";
+    private static final String INVALID_CREDENTIALS = "Empresa, CPF ou senha inválidos";
 
     private final AuthenticationManager authenticationManager;
     private final TokenService tokenService;
@@ -61,7 +61,7 @@ public class AuthService {
     }
 
     /**
-     * Login do colaborador: empresa pelo CNPJ, pessoa pelo blind index do CPF,
+     * Login do colaborador: empresa pelo slug, pessoa pelo blind index do CPF,
      * credencial pela senha.
      *
      * <p>
@@ -99,13 +99,13 @@ public class AuthService {
     }
 
     /**
-     * CNPJ e CPF malformados morrem aqui em silêncio, como um cadastro que não
-     * existe. Deixá-los estourar em {@code CpfUtils} produziria "CPF inválido" —
-     * uma mensagem diferente da de senha errada, e portanto um oráculo.
+     * Slug fora do formato e CPF malformado morrem aqui em silêncio, como um
+     * cadastro que não existe. Deixá-los estourar produziria uma mensagem
+     * diferente da de senha errada, e portanto um oráculo.
      */
     private Optional<Collaborator> findCandidate(CollaboratorLoginRequestDTO data) {
-        String cnpj = CnpjUtils.normalizeQuietly(data.cnpj());
-        if (!CnpjUtils.hasValidCheckDigits(cnpj)) {
+        String slug = SlugUtils.sanitize(data.companySlug());
+        if (!SlugUtils.isValid(slug)) {
             return Optional.empty();
         }
         String cpf = data.cpf() == null ? "" : data.cpf().replaceAll("\\D", "");
@@ -113,7 +113,7 @@ public class AuthService {
             return Optional.empty();
         }
 
-        return companyRepository.findByCnpj(cnpj)
+        return companyRepository.findBySlug(slug)
                 .filter(Company::isEnabled)
                 .flatMap(company -> collaboratorRepository
                         .findByCompanyIdAndCpfHash(company.getId(), cryptoService.blindIndex(cpf)));
@@ -140,7 +140,7 @@ public class AuthService {
         // Revalida o estado atual: quem foi desativado — ou cuja empresa foi
         // suspensa — depois do login não renova.
         Collaborator collaborator = collaboratorRepository.findById(consumed.getSubjectId())
-                .filter(Collaborator::isEnabled)
+                .filter(candidate -> candidate.isEnabled())
                 .orElseThrow(() -> new BusinessException(
                         "Seu acesso está desativado. Entre em contato com o RH."));
         return new LoginResponseDTO(

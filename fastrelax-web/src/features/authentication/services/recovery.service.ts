@@ -21,13 +21,16 @@ export function requestUserReset(email: string): Promise<ApiResult<null>> {
 }
 
 /**
- * Colaborador: o e-mail só é único dentro da empresa, então o CNPJ é
+ * Colaborador: o e-mail só é único dentro da empresa, então o slug é
  * obrigatório. É o mesmo que ele já digita no login.
  */
-export function requestCollaboratorReset(cnpj: string, email: string): Promise<ApiResult<null>> {
+export function requestCollaboratorReset(
+  companySlug: string,
+  email: string,
+): Promise<ApiResult<null>> {
   return apiFetch<null>(`${RESOURCE}/collaborator/forgot`, {
     method: "POST",
-    body: { cnpj, email },
+    body: { companySlug, email },
   });
 }
 

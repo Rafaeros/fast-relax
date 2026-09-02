@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { Alert, Button, Icon, Input, MaskedInput } from "@/components/ui";
+import { Alert, Button, Icon, Input } from "@/components/ui";
 import {
   requestCollaboratorResetAction,
   requestUserResetAction,
@@ -10,8 +10,8 @@ import { RECOVERY_INITIAL_STATE } from "@/features/authentication/types/auth.typ
 
 export type ForgotPasswordFormProps = {
   /**
-   * `collaborator` pede também o CNPJ: o e-mail dele só é único dentro da
-   * empresa, e sem isso a busca seria ambígua.
+   * `collaborator` pede também o identificador da empresa: o e-mail dele só é
+   * único dentro da empresa, e sem isso a busca seria ambígua.
    */
   audience: "user" | "collaborator";
 };
@@ -51,17 +51,18 @@ export function ForgotPasswordForm({ audience }: ForgotPasswordFormProps) {
       )}
 
       {collaborator && (
-        <MaskedInput
-          name="cnpj"
-          mask="cnpj"
-          label="CNPJ da empresa"
-          placeholder="00.000.000/0000-00"
-          inputMode="numeric"
+        <Input
+          name="companySlug"
+          label="Identificador da empresa"
+          placeholder="ex.: lanx"
           autoComplete="organization"
-          autoFocus={!state.cnpj}
+          onInput={(event) => {
+            event.currentTarget.value = event.currentTarget.value.toLowerCase();
+          }}
+          autoFocus={!state.companySlug}
           disabled={pending}
-          defaultValue={state.cnpj ?? ""}
-          error={fieldErrors.cnpj}
+          defaultValue={state.companySlug ?? ""}
+          error={fieldErrors.companySlug}
           leadingIcon={<Icon name="building" />}
         />
       )}
@@ -76,7 +77,7 @@ export function ForgotPasswordForm({ audience }: ForgotPasswordFormProps) {
         disabled={pending}
         // Volta preenchido no erro: o React limpa os campos não controlados
         // depois de uma action, e redigitar o e-mail inteiro por um erro de
-        // digitação no CNPJ seria atrito puro.
+        // digitação no identificador da empresa seria atrito puro.
         defaultValue={state.email ?? ""}
         error={fieldErrors.email}
         leadingIcon={<Icon name="mail" />}

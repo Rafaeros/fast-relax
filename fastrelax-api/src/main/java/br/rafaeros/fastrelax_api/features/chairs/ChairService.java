@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Objects;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -28,6 +29,8 @@ public class ChairService {
     private final ChairRepository chairRepository;
     private final FirmwareRepository firmwareRepository;
     private final CurrentTenant currentTenant;
+    private final ChairClient chairClient;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Value("${app.chair.offline-after-seconds:180}")
     private int offlineAfterSeconds;
@@ -97,11 +100,25 @@ public class ChairService {
         return toResponse(chairRepository.save(chair));
     }
 
+    /**
+     * Ativa/desativa e propaga aos dois lados que precisam saber: o ESP32 (relé
+     * de corte de energia do painel) e, se for uma desativação, a sessão em
+     * andamento naquela cadeira.
+     */
     @Transactional
     public ChairResponseDTO toggleActive(Long id) {
         Chair chair = findEntityById(id);
         chair.setActive(!chair.isActive());
-        return toResponse(chairRepository.save(chair));
+        Chair saved = chairRepository.save(chair);
+
+        // Best-effort: offline agora, o próximo heartbeat reconcilia sozinho
+        // (o ESP32 lê o mesmo `active` na resposta). O toggle no banco já vale
+        // de qualquer forma — não é o dispositivo que decide se foi aceito.
+        chairClient.pushPower(saved, saved.isActive());
+
+        eventPublisher.publishEvent(new ChairActivationChangedEvent(saved.getId(), saved.isActive()));
+
+        return toResponse(saved);
     }
 
     @Transactional

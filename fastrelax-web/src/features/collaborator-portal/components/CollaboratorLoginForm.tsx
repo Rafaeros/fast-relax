@@ -7,13 +7,13 @@ import { collaboratorLoginAction } from "@/features/collaborator-portal/actions/
 import { COLLABORATOR_LOGIN_INITIAL_STATE } from "@/features/collaborator-portal/types/portal.types";
 
 /**
- * Entrada do colaborador: CNPJ da empresa, CPF e senha.
+ * Entrada do colaborador: slug da empresa, CPF e senha.
  *
  * <p>
- * O CNPJ vem primeiro porque é ele que define de qual empresa é o CPF — o
- * mesmo documento pode estar cadastrado em dois clientes. Os campos numéricos
- * abrem o teclado numérico por padrão (`inputMode`): digitar CPF no teclado
- * alfabético do celular é atrito puro.
+ * O slug vem primeiro porque é ele que define de qual empresa é o CPF — o
+ * mesmo documento pode estar cadastrado em dois clientes. O CPF abre o teclado
+ * numérico por padrão (`inputMode`): digitá-lo no teclado alfabético do
+ * celular é atrito puro.
  */
 export function CollaboratorLoginForm() {
   const [state, formAction, pending] = useActionState(
@@ -30,18 +30,21 @@ export function CollaboratorLoginForm() {
     <form action={formAction} className="flex flex-col gap-5" noValidate>
       {generalError && <Alert tone="error">{state.message}</Alert>}
 
-      <MaskedInput
-        name="cnpj"
-        mask="cnpj"
-        label="CNPJ da empresa"
-        placeholder="00.000.000/0000-00"
-        inputMode="numeric"
+      <Input
+        name="companySlug"
+        label="Identificador da empresa"
+        placeholder="ex.: lanx"
         autoComplete="organization"
+        // Minúsculas de propósito: é assim que o backend compara, e digitar já
+        // nesse formato evita o "por que não funciona?" de um "Lanx" com maiúscula.
+        onInput={(event) => {
+          event.currentTarget.value = event.currentTarget.value.toLowerCase();
+        }}
         // Só na primeira carga: depois de um erro o cursor pertence à senha.
-        autoFocus={!state.cnpj}
+        autoFocus={!state.companySlug}
         disabled={pending}
-        defaultValue={state.cnpj ?? ""}
-        error={fieldErrors.cnpj}
+        defaultValue={state.companySlug ?? ""}
+        error={fieldErrors.companySlug}
         leadingIcon={<Icon name="building" />}
       />
 
@@ -64,9 +67,9 @@ export function CollaboratorLoginForm() {
         label="Senha"
         placeholder="Sua senha"
         autoComplete="current-password"
-        // Foco vai para cá quando já houve tentativa: CNPJ e CPF continuam
+        // Foco vai para cá quando já houve tentativa: empresa e CPF continuam
         // preenchidos, e a senha é o que resta corrigir.
-        autoFocus={state.status === "error" && Boolean(state.cnpj)}
+        autoFocus={state.status === "error" && Boolean(state.companySlug)}
         disabled={pending}
         error={fieldErrors.password}
         leadingIcon={<Icon name="key" />}

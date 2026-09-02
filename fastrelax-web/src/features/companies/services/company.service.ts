@@ -11,8 +11,11 @@ import type {
 
 /**
  * Acesso à API de empresas (`/companies`).
- * Todas as rotas exigem SYSADMIN — o token sai do cookie httpOnly, então estas
- * funções só rodam no servidor.
+ *
+ * <p>
+ * O CRUD exige SYSADMIN; a exceção é `getMyCompany`, que qualquer
+ * COMPANY_ADMIN/COMPANY_RH autenticado alcança para ver a própria empresa. O
+ * token sai do cookie httpOnly, então estas funções só rodam no servidor.
  */
 
 const RESOURCE = "/companies";
@@ -35,6 +38,11 @@ export async function listCompanies(
 
 export async function getCompany(id: number): Promise<ApiResult<Company>> {
   return apiFetch<Company>(`${RESOURCE}/${id}`, { token: await readAccessToken() });
+}
+
+/** A própria empresa de quem está logado — o que a tela "Minha empresa" do RH usa. */
+export async function getMyCompany(): Promise<ApiResult<Company>> {
+  return apiFetch<Company>(`${RESOURCE}/me`, { token: await readAccessToken() });
 }
 
 export async function createCompany(input: SaveCompanyInput): Promise<ApiResult<Company>> {

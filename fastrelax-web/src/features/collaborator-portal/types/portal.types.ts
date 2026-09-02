@@ -19,11 +19,12 @@ export type CollaboratorAuthSession = {
 /**
  * Espelha `CollaboratorLoginRequestDTO`.
  *
- * O CNPJ entra porque o CPF só é único dentro da empresa: sem ele a busca seria
- * ambígua no momento em que a mesma pessoa fosse colaboradora de dois clientes.
+ * O slug da empresa entra porque o CPF só é único dentro da empresa: sem ele a
+ * busca seria ambígua no momento em que a mesma pessoa fosse colaboradora de
+ * dois clientes.
  */
 export type CollaboratorCredentials = {
-  cnpj: string;
+  companySlug: string;
   cpf: string;
   password: string;
 };
@@ -128,16 +129,17 @@ export type BookSessionInput = {
 };
 
 export type CollaboratorLoginFieldErrors = Partial<
-  Record<"cnpj" | "cpf" | "password", string>
+  Record<"companySlug" | "cpf" | "password", string>
 >;
 
 /**
  * Estado do formulário de login do colaborador.
  *
  * <p>
- * CNPJ e CPF voltam preenchidos no erro e servem de `defaultValue`: o React
- * limpa os campos não controlados depois de uma action, e sem isso errar a
- * senha custava redigitar 25 dígitos — no celular, em pé na frente da cadeira.
+ * O slug e o CPF voltam preenchidos no erro e servem de `defaultValue`: o
+ * React limpa os campos não controlados depois de uma action, e sem isso
+ * errar a senha custava redigitar tudo de novo — no celular, em pé na frente
+ * da cadeira.
  *
  * <p>
  * A senha nunca volta. Reexibi-la a mandaria de novo pela rede, no payload que
@@ -147,8 +149,8 @@ export type CollaboratorLoginFormState = {
   status: "idle" | "error";
   message?: string;
   fieldErrors?: CollaboratorLoginFieldErrors;
-  /** Como foram digitados, com máscara — o campo os reaplica ao remontar. */
-  cnpj?: string;
+  /** Como foram digitados — o campo os reaplica ao remontar. */
+  companySlug?: string;
   cpf?: string;
 };
 

@@ -10,7 +10,8 @@ export type Collaborator = {
   name: string;
   /** Vem decriptado pela API, sem máscara (11 dígitos). */
   cpf: string;
-  phoneNumber: string;
+  /** Nulo quando não foi informado. */
+  phoneNumber: string | null;
   /** Nulo quando não foi informado; sem ele não há recuperação de senha. */
   email: string | null;
   /** Verdadeiro enquanto o colaborador ainda não definiu a própria senha. */
@@ -46,7 +47,8 @@ export type ListCollaboratorsParams = CollaboratorFilter & PageParams;
 export type CreateCollaboratorInput = {
   name: string;
   cpf: string;
-  phoneNumber: string;
+  /** Opcional: parte do quadro não tem telefone cadastrado. */
+  phoneNumber?: string;
   /**
    * Opcional. Preenchido, a pessoa recebe convite e define a própria senha; em
    * branco, o sistema gera uma temporária para o RH repassar.
@@ -64,6 +66,7 @@ export type CreateCollaboratorInput = {
 export type UpdateCollaboratorInput = {
   departmentId: number;
   name: string;
+  /** Em branco remove o telefone. */
   phoneNumber: string;
   /** Em branco remove o e-mail — e com ele a recuperação de senha. */
   email?: string;

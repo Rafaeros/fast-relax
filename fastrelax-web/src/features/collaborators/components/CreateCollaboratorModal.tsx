@@ -26,10 +26,14 @@ export function CreateCollaboratorModal({
   // Trocar a key remonta o formulário: campos com estado próprio (as máscaras
   // de CPF e telefone) voltam a zero, o que `form.reset()` não faria.
   const [formKey, setFormKey] = useState(0);
+  // Reflete os departamentos disponíveis dentro do formulário, incluindo os
+  // cadastrados pelo "+" sem sair do modal — sem isto o aviso abaixo e o botão
+  // de cadastrar continuariam travados mesmo depois do cadastro rápido.
+  const [availableDepartments, setAvailableDepartments] = useState(departments);
   const toast = useToast();
 
   const fieldErrors = state.fieldErrors ?? {};
-  const noDepartments = departments.length === 0;
+  const noDepartments = availableDepartments.length === 0;
   // O modal não fecha sozinho no sucesso: quando sai senha temporária, ela
   // aparece uma única vez e some para sempre se o RH não copiar antes.
   const delivery = state.status === "success" ? state.credential : undefined;
@@ -37,6 +41,7 @@ export function CreateCollaboratorModal({
   const resetForm = () => {
     setState(CREATE_COLLABORATOR_INITIAL_STATE);
     setFormKey((current) => current + 1);
+    setAvailableDepartments(departments);
   };
 
   const openModal = () => {
@@ -145,6 +150,7 @@ export function CreateCollaboratorModal({
 
           <CollaboratorFormFields
             departments={departments}
+            onDepartmentsChange={setAvailableDepartments}
             fieldErrors={fieldErrors}
             disabled={pending}
           />

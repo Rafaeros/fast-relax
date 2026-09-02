@@ -4,12 +4,23 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 /** Cadastro e edição de empresa cliente, feito pela equipe da plataforma. */
 public record SaveCompanyRequestDTO(
     @NotBlank(message = "O CNPJ é obrigatório")
     String cnpj,
+
+    /**
+     * Em branco deriva da primeira palavra do nome. Informado, é o que o
+     * colaborador vai digitar no login — mesmas regras de formato do slug já
+     * gravado (minúsculas, dígitos e hífen).
+     */
+    @Pattern(regexp = "^$|^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$",
+            message = "O slug deve ter só letras minúsculas, números e hífen")
+    @Size(max = 60, message = "O slug deve ter no máximo 60 caracteres")
+    String slug,
 
     @NotBlank(message = "O nome é obrigatório")
     @Size(min = 2, max = 255, message = "O nome deve ter entre 2 e 255 caracteres")

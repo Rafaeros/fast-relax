@@ -137,7 +137,6 @@ public class CollaboratorImportService {
     private RowOutcome processRow(Row row, Map<String, Department> departmentCache) {
         String name = requireText(ImportCellReader.readString(row, COL_NAME), "Nome");
         String rawCpf = requireText(ImportCellReader.readString(row, COL_CPF), "CPF");
-        String phone = requireText(ImportCellReader.readString(row, COL_PHONE), "Telefone");
         String departmentName = requireText(ImportCellReader.readString(row, COL_DEPARTMENT), "Departamento");
 
         LocalTime allowedStart = ImportCellReader.readTime(row, COL_ALLOWED_START, "Início da janela permitida");
@@ -146,17 +145,17 @@ public class CollaboratorImportService {
             throw new BusinessException("Fim da janela permitida deve ser posterior ao início");
         }
 
-        // Coluna opcional: planilha antiga não tem, e a linha entra sem e-mail.
+        // Colunas opcionais: em branco, a linha entra (ou permanece) sem o dado —
+        // reimportar sem preencher não apaga o que já estava cadastrado.
+        String phone = ImportCellReader.readString(row, COL_PHONE);
         String email = ImportCellReader.readString(row, COL_EMAIL);
 
         // Aceita CPF formatado ("123.456.789-00") e repõe os zeros à esquerda que o
         // Excel apaga ao tratar a coluna como número.
         String cpf = CpfUtils.normalize(CpfUtils.padLeadingZeros(rawCpf.replaceAll("\\D", "")));
-        // Aceita "(43) 98412-8306" e grava só os dígitos.
-        String normalizedPhone = PhoneUtils.normalize(phone);
 
         DepartmentOutcome department = resolveDepartment(departmentName, departmentCache);
-        CollaboratorOutcome collaborator = upsertCollaborator(name, cpf, normalizedPhone, email,
+        CollaboratorOutcome collaborator = upsertCollaborator(name, cpf, phone, email,
                 department.department());
         int schedules = replaceWeekdaySchedules(collaborator.collaborator(), allowedStart, allowedEnd);
 
@@ -216,7 +215,7 @@ public class CollaboratorImportService {
 
         if (existing != null) {
             existing.setName(name);
-            existing.setPhoneNumber(phone);
+            applyPhone(existing, phone);
             existing.setDepartment(department);
             applyEmail(existing, email);
 
@@ -239,7 +238,7 @@ public class CollaboratorImportService {
         created.setName(name);
         created.setCpfEncrypted(cryptoService.encrypt(cpf));
         created.setCpfHash(cpfHash);
-        created.setPhoneNumber(phone);
+        applyPhone(created, phone);
         created.setDepartment(department);
         applyEmail(created, email);
         provisioningService.initialize(created);
@@ -252,9 +251,8 @@ public class CollaboratorImportService {
      * E-mail da planilha, quando a coluna vier preenchida.
      *
      * <p>
-     * Conflito dentro da empresa recusa a linha em vez de sobrescrever: dois
-     * colaboradores com o mesmo endereço fariam a recuperação de senha apontar
-     * para a pessoa errada.
+     * Não é checado contra os demais colaboradores: só o CPF identifica de forma
+     * única dentro da empresa. Duas linhas podem trazer o mesmo e-mail.
      */
     private void applyEmail(Collaborator collaborator, String email) {
         if (email == null || email.isBlank()) {
@@ -263,16 +261,20 @@ public class CollaboratorImportService {
             return;
         }
 
-        String normalized = email.trim().toLowerCase();
-        collaboratorRepository
-                .findByCompanyIdAndEmailIgnoreCaseAndIdNot(
-                        currentTenant.companyId(), normalized,
-                        collaborator.getId() == null ? -1L : collaborator.getId())
-                .ifPresent(other -> {
-                    throw new BusinessException("E-mail já cadastrado para outro colaborador");
-                });
+        collaborator.setEmail(email.trim().toLowerCase());
+    }
 
-        collaborator.setEmail(normalized);
+    /**
+     * Telefone da planilha, reconciliado como o e-mail: em branco não apaga o
+     * que já estava cadastrado, e a coluna passou a ser opcional.
+     */
+    private void applyPhone(Collaborator collaborator, String phone) {
+        if (phone == null || phone.isBlank()) {
+            return;
+        }
+
+        // Aceita "(43) 98412-8306" e grava só os dígitos.
+        collaborator.setPhoneNumber(PhoneUtils.normalize(phone));
     }
 
     /**

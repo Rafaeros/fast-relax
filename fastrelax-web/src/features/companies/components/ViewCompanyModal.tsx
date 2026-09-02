@@ -18,6 +18,7 @@ export function ViewCompanyModal({ company, onClose, onEdit }: ViewCompanyModalP
     ? [
         { label: "Razão social", value: company.name, full: true },
         { label: "CNPJ", value: formatCnpj(company.cnpj) },
+        { label: "Slug (login)", value: company.slug },
         {
           label: "Contrato",
           value: (

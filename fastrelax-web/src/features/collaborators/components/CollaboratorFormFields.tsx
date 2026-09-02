@@ -1,6 +1,8 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { Icon, Input, MaskedInput, Select } from "@/components/ui";
+import { QuickCreateDepartmentButton } from "@/features/departments/components/QuickCreateDepartmentButton";
 import type { CollaboratorFieldErrors } from "@/features/collaborators/schemas/collaborator.schema";
 import type { Collaborator } from "@/features/collaborators/types/collaborator.types";
 import type { Department } from "@/features/departments/types/department.types";
@@ -13,6 +15,12 @@ export type CollaboratorFormFieldsProps = {
   collaborator?: Collaborator;
   /** Mostra o seletor de situação (só faz sentido na edição). */
   showActive?: boolean;
+  /**
+   * Avisa o pai quando a lista efetiva de departamentos muda — inclui os
+   * cadastrados pelo "+" sem sair deste formulário. Quem mostra o aviso de
+   * "nenhum departamento" usa isto para não travar depois de um cadastro rápido.
+   */
+  onDepartmentsChange?: (departments: Department[]) => void;
 };
 
 /**
@@ -26,9 +34,26 @@ export function CollaboratorFormFields({
   disabled,
   collaborator,
   showActive = false,
+  onDepartmentsChange,
 }: CollaboratorFormFieldsProps) {
   const editing = Boolean(collaborator);
-  const noDepartments = departments.length === 0;
+  // Cadastrados pelo "+" nesta sessão do formulário, além dos que já vieram do
+  // pai — a lista do pai só se atualiza numa próxima navegação/revalidação.
+  const [extraDepartments, setExtraDepartments] = useState<Department[]>([]);
+  const allDepartments = useMemo(() => {
+    const extraIds = new Set(extraDepartments.map((department) => department.id));
+    return [...departments.filter((department) => !extraIds.has(department.id)), ...extraDepartments];
+  }, [departments, extraDepartments]);
+  const [departmentId, setDepartmentId] = useState(
+    collaborator?.departmentId ? String(collaborator.departmentId) : "",
+  );
+  const noDepartments = allDepartments.length === 0;
+
+  const handleDepartmentCreated = (department: Department) => {
+    setExtraDepartments((current) => [...current, department]);
+    setDepartmentId(String(department.id));
+    onDepartmentsChange?.([...allDepartments, department]);
+  };
 
   return (
     <>
@@ -67,11 +92,11 @@ export function CollaboratorFormFields({
         <MaskedInput
           mask="phone"
           name="phoneNumber"
-          label="Telefone"
+          label="Telefone (opcional)"
           placeholder="(11) 90000-0000"
           autoComplete="off"
           disabled={disabled}
-          defaultValue={collaborator?.phoneNumber}
+          defaultValue={collaborator?.phoneNumber ?? ""}
           error={fieldErrors.phoneNumber}
           leadingIcon={<Icon name="phone" />}
         />
@@ -102,22 +127,35 @@ export function CollaboratorFormFields({
       />
 
       <div className={showActive ? "grid gap-5 sm:grid-cols-2" : undefined}>
-        <Select
-          name="departmentId"
-          label="Departamento"
-          defaultValue={collaborator?.departmentId ?? ""}
-          disabled={disabled || noDepartments}
-          error={fieldErrors.departmentId}
-        >
-          <option value="" disabled>
-            Selecione o departamento
-          </option>
-          {departments.map((department) => (
-            <option key={department.id} value={department.id}>
-              {department.name}
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center justify-between">
+            <label
+              htmlFor="collaborator-department-id"
+              className="text-xs font-semibold tracking-wide text-ink-secondary"
+            >
+              Departamento
+            </label>
+            <QuickCreateDepartmentButton disabled={disabled} onCreated={handleDepartmentCreated} />
+          </div>
+
+          <Select
+            id="collaborator-department-id"
+            name="departmentId"
+            value={departmentId}
+            onChange={(event) => setDepartmentId(event.target.value)}
+            disabled={disabled || noDepartments}
+            error={fieldErrors.departmentId}
+          >
+            <option value="" disabled>
+              Selecione o departamento
             </option>
-          ))}
-        </Select>
+            {allDepartments.map((department) => (
+              <option key={department.id} value={department.id}>
+                {department.name}
+              </option>
+            ))}
+          </Select>
+        </div>
 
         {showActive && (
           <Select

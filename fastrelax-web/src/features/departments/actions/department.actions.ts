@@ -121,3 +121,32 @@ export async function deleteDepartmentAction(id: number): Promise<MutationResult
 
   return { ok: result.ok, message: result.message };
 }
+
+export type QuickCreateDepartmentResult =
+  | { status: "success"; department: Department }
+  | { status: "error"; message: string };
+
+/**
+ * Cadastro rápido a partir de outro formulário (ex.: modal de colaborador),
+ * sem sair da tela para ir até a página de departamentos.
+ *
+ * Devolve o registro criado — quem chamou usa o id para já deixar selecionado.
+ */
+export async function quickCreateDepartmentAction(name: string): Promise<QuickCreateDepartmentResult> {
+  const validation = validateDepartmentInput({ name });
+
+  if (!validation.valid) {
+    const message = validation.fieldErrors.name ?? "Nome inválido.";
+    return { status: "error", message };
+  }
+
+  const result = await createDepartment({ name: validation.data.name });
+
+  if (!result.ok) {
+    return { status: "error", message: result.message };
+  }
+
+  revalidatePath(ROUTE);
+  revalidatePath("/painel/colaboradores");
+  return { status: "success", department: result.data };
+}

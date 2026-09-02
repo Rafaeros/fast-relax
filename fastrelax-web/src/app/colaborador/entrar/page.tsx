@@ -67,8 +67,8 @@ export default async function CollaboratorLoginPage({
             <span className="eyebrow">Área do colaborador</span>
             <h1 className="font-display text-3xl text-ink-primary">Bem-vindo</h1>
             <p className="text-sm leading-relaxed text-ink-secondary">
-              Informe o CNPJ da empresa, seu CPF e sua senha para agendar e
-              acompanhar suas sessões.
+              Informe o identificador da empresa, seu CPF e sua senha para
+              agendar e acompanhar suas sessões.
             </p>
           </div>
 

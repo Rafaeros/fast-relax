@@ -63,7 +63,7 @@ export function EditCompanyModal({
       size="md"
       dismissible={!pending}
       title="Editar empresa"
-      description="Alterar o CNPJ muda o que os colaboradores digitam para entrar."
+      description="Alterar o slug muda o que os colaboradores digitam para entrar."
       footer={
         <>
           <Button variant="ghost" size="sm" onClick={close} disabled={pending}>

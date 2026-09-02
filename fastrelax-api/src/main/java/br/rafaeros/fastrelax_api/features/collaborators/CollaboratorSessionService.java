@@ -20,7 +20,6 @@ import br.rafaeros.fastrelax_api.core.exceptions.ResourceNotFoundException;
 import br.rafaeros.fastrelax_api.core.security.AccessGuard;
 import br.rafaeros.fastrelax_api.core.security.Principals;
 import br.rafaeros.fastrelax_api.features.chairs.Chair;
-import br.rafaeros.fastrelax_api.features.chairs.dtos.ChairResponseDTO;
 import br.rafaeros.fastrelax_api.features.collaborators.dtos.AvailableChairDTO;
 import br.rafaeros.fastrelax_api.features.collaborators.dtos.AvailableDayDTO;
 import br.rafaeros.fastrelax_api.features.collaborators.dtos.AvailableSlotsResponseDTO;
@@ -377,6 +376,28 @@ public class CollaboratorSessionService {
         CollaboratorSession saved = sessionRepository.save(session);
         events.publishEvent(SessionLifecycleEvent.of(SessionLifecycleEvent.Type.CANCELLED, saved));
         return new CollaboratorSessionResponseDTO(saved);
+    }
+
+    /**
+     * Encerra a sessão em andamento numa cadeira, se houver — chamado quando a
+     * Physical desativa a cadeira.
+     *
+     * <p>
+     * Não passa por {@link #findEntityById}: aquele método valida que quem
+     * pediu tem acesso à empresa da sessão, o que faz sentido para uma
+     * requisição de RH/colaborador, mas não para esta reação a um evento de
+     * sistema — a Physical desativando uma cadeira não está autenticada como
+     * a empresa dona dela, e não precisa estar.
+     */
+    @Transactional
+    public void forceStopByChair(Long chairId) {
+        sessionRepository.findByChairIdAndStatus(chairId, SessionStatus.STARTED)
+                .ifPresent(session -> {
+                    chairCommandService.stopFor(session.getChair(), session.getId());
+                    session.setStatus(SessionStatus.CANCELLED);
+                    CollaboratorSession saved = sessionRepository.save(session);
+                    events.publishEvent(SessionLifecycleEvent.of(SessionLifecycleEvent.Type.CANCELLED, saved));
+                });
     }
 
     private CollaboratorSession findEntityById(Long id) {

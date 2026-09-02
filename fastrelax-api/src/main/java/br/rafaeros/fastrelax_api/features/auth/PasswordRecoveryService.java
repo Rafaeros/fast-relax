@@ -11,7 +11,7 @@ import br.rafaeros.fastrelax_api.core.mail.MailSender;
 import br.rafaeros.fastrelax_api.core.security.CredentialAccounts;
 import br.rafaeros.fastrelax_api.core.security.CredentialHolder;
 import br.rafaeros.fastrelax_api.core.security.CredentialService;
-import br.rafaeros.fastrelax_api.core.util.CnpjUtils;
+import br.rafaeros.fastrelax_api.core.util.SlugUtils;
 import br.rafaeros.fastrelax_api.features.companies.Company;
 import br.rafaeros.fastrelax_api.features.companies.CompanyRepository;
 import lombok.RequiredArgsConstructor;
@@ -22,14 +22,15 @@ import lombok.extern.slf4j.Slf4j;
  *
  * <p>
  * Serve painel e colaborador com o mesmo código: o que difere é só como se
- * encontra a conta — e-mail global no painel, CNPJ mais e-mail no colaborador —,
- * e isso está encapsulado no {@code CredentialAccount} de cada tipo.
+ * encontra a conta — e-mail global no painel, slug da empresa mais e-mail no
+ * colaborador —, e isso está encapsulado no {@code CredentialAccount} de cada
+ * tipo.
  *
  * <p>
  * <b>A resposta do pedido nunca varia.</b> E-mail inexistente, conta desativada,
  * empresa suspensa e envio bem-sucedido produzem a mesma mensagem. Distinguir
  * qualquer um deles transformaria a tela pública de recuperação num verificador
- * de "esta pessoa trabalha aqui?" — e, com o CNPJ, num de "esta empresa é
+ * de "esta pessoa trabalha aqui?" — e, com o slug, num de "esta empresa é
  * cliente da Physical?".
  */
 @Slf4j
@@ -60,20 +61,20 @@ public class PasswordRecoveryService {
 
     /**
      * Recuperação do colaborador: o e-mail só é único dentro da empresa, então o
-     * CNPJ é obrigatório para a busca não ser ambígua. É o mesmo CNPJ que ele
+     * slug é obrigatório para a busca não ser ambígua. É o mesmo slug que ele
      * digita no login, então não há informação nova a pedir.
      */
     @Transactional
-    public void requestForCollaborator(String cnpj, String email) {
-        String digits = CnpjUtils.normalizeQuietly(cnpj);
-        if (!CnpjUtils.hasValidCheckDigits(digits)) {
-            // Some em silêncio: CNPJ malformado é tentativa inválida, e responder
-            // diferente já diria que o formato importa — e portanto que existe
-            // uma busca acontecendo do outro lado.
+    public void requestForCollaborator(String companySlug, String email) {
+        String slug = SlugUtils.sanitize(companySlug);
+        if (!SlugUtils.isValid(slug)) {
+            // Some em silêncio: slug fora do formato é tentativa inválida, e
+            // responder diferente já diria que o formato importa — e portanto
+            // que existe uma busca acontecendo do outro lado.
             return;
         }
 
-        companyRepository.findByCnpj(digits)
+        companyRepository.findBySlug(slug)
                 .filter(Company::isEnabled)
                 .flatMap(company -> accounts.of(RefreshToken.SubjectType.COLLABORATOR)
                         .flatMap(account -> account.findByEmail(normalize(email), company.getId())))

@@ -18,6 +18,7 @@ import type { LookupAddress } from "@/features/lookup/types/lookup.types";
  */
 export type CompanyDraft = {
   cnpj: string;
+  slug: string;
   name: string;
   email: string;
   phone: string;
@@ -134,6 +135,7 @@ function initialDraft(states: State[], company?: Company): CompanyDraft {
 
   return {
     cnpj: company?.cnpj ?? "",
+    slug: company?.slug ?? "",
     name: company?.name ?? "",
     email: company?.email ?? "",
     phone: company?.phone ?? "",

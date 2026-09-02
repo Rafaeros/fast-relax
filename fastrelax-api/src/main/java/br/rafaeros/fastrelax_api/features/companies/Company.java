@@ -30,8 +30,10 @@ import lombok.Setter;
  * decidir o que cada requisição enxerga.
  *
  * <p>
- * O CNPJ é a identidade pública: é por ele que o colaborador diz de qual
- * empresa é na tela de login, já que o CPF só é único dentro do tenant.
+ * O slug é a identidade pública na tela de login: é por ele que o colaborador
+ * diz de qual empresa é, já que o CPF só é único dentro do tenant. O CNPJ
+ * continua no cadastro como identidade fiscal, mas ninguém mais digita os 14
+ * dígitos para entrar.
  */
 @Entity
 @Table(name = "companies")
@@ -49,12 +51,24 @@ public class Company {
     @JoinColumn(name = "address_id", nullable = false)
     private Address address;
 
-    /** Só dígitos: a busca do login normaliza antes de comparar. */
+    /** Identidade fiscal. Só dígitos: a normalização acontece antes de gravar. */
     @Column(nullable = false, unique = true, length = 20)
     private String cnpj;
 
     @Column(nullable = false)
     private String name;
+
+    /**
+     * Identificador curto e público usado no login do colaborador.
+     *
+     * <p>
+     * Cadastrado explicitamente ou derivado da primeira palavra do nome (ver
+     * {@link br.rafaeros.fastrelax_api.core.util.SlugUtils}). Sempre minúsculo
+     * e sem acento — é o que compara igual, independente de como a pessoa
+     * digitou.
+     */
+    @Column(nullable = false, unique = true, length = 60)
+    private String slug;
 
     @Column(nullable = false, unique = true)
     private String email;

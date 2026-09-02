@@ -67,7 +67,8 @@ public class Collaborator extends SoftDeletableCompanyEntity
     @Column(name = "cpf_hash", nullable = false, columnDefinition = "TEXT")
     private String cpfHash;
 
-    @Column(name = "phone_number", nullable = false, length = 20)
+    /** Opcional: reconciliado como o e-mail — em branco mantém o que já existia. */
+    @Column(name = "phone_number", length = 20)
     private String phoneNumber;
 
     /**

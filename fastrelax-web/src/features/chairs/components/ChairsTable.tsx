@@ -173,34 +173,42 @@ export function ChairsTable({
             <ViewAction onClick={() => setViewing(row)} />
             <EditAction onClick={() => setEditing(row)} />
             {isPlatformTeam && <PushNetworkAction chair={row} onPushed={reload} />}
-            <RowAction
-              label={row.active ? "Desativar" : "Ativar"}
-              icon={row.active ? "eyeOff" : "check"}
-              onClick={async () => {
-                const result = await toggleChairActiveAction(row.id);
-                // Recusa do backend (403, cadeira em uso) só ia para o log; sem
-                // o toast a linha voltava igual, sem explicação.
-                if (result.ok) {
-                  reload();
-                  toast.success(result.message);
-                } else {
-                  toast.error(result.message);
-                }
-              }}
-            />
-            <DeleteAction
-              itemName={row.name}
-              description="A cadeira sai do rodízio de atendimento. As sessões já registradas continuam no histórico."
-              onConfirm={async () => {
-                const result = await deleteChairAction(row.id);
-                if (result.ok) {
-                  reload();
-                  toast.success(result.message);
-                } else {
-                  toast.error(result.message);
-                }
-              }}
-            />
+            {/*
+              Ativar/desativar e remover refletem o contrato comercial com a
+              Physical — o RH da empresa cliente não decide isso sobre o próprio
+              parque. O backend já bloqueia (`@access.isPlatformTeam()`); esconder
+              aqui evita a linha sumir com um 403 sem explicação.
+            */}
+            {isPlatformTeam && (
+              <RowAction
+                label={row.active ? "Desativar" : "Ativar"}
+                icon={row.active ? "eyeOff" : "check"}
+                onClick={async () => {
+                  const result = await toggleChairActiveAction(row.id);
+                  if (result.ok) {
+                    reload();
+                    toast.success(result.message);
+                  } else {
+                    toast.error(result.message);
+                  }
+                }}
+              />
+            )}
+            {isPlatformTeam && (
+              <DeleteAction
+                itemName={row.name}
+                description="A cadeira sai do rodízio de atendimento. As sessões já registradas continuam no histórico."
+                onConfirm={async () => {
+                  const result = await deleteChairAction(row.id);
+                  if (result.ok) {
+                    reload();
+                    toast.success(result.message);
+                  } else {
+                    toast.error(result.message);
+                  }
+                }}
+              />
+            )}
           </RowActions>
         ),
       },

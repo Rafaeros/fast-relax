@@ -54,6 +54,11 @@ public class SecurityConfig {
                 // Cadastro de empresas e catálogo de firmware são da equipe da
                 // plataforma. As demais rotas resolvem o papel no @PreAuthorize,
                 // que é onde a regra fica junto do caso de uso.
+                //
+                // /companies/me é a exceção: RH/admin do cliente lendo a própria
+                // empresa. Precisa vir antes do bloqueio geral — a primeira regra
+                // que casar decide, e "/companies/**" casaria primeiro.
+                .requestMatchers(HttpMethod.GET, "/companies/me").authenticated()
                 .requestMatchers("/companies/**").hasRole("SYSADMIN")
                 .requestMatchers(HttpMethod.POST, "/firmwares/**").hasRole("SYSADMIN")
                 .requestMatchers(HttpMethod.PUT, "/firmwares/**").hasRole("SYSADMIN")

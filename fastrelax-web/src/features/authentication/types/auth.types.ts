@@ -116,7 +116,7 @@ export type CredentialDelivery = {
   email: string | null;
 };
 
-export type RecoveryFieldErrors = Partial<Record<"cnpj" | "email", string>>;
+export type RecoveryFieldErrors = Partial<Record<"companySlug" | "email", string>>;
 
 /** Estado do formulário de "esqueci minha senha". */
 export type RecoveryFormState = {
@@ -124,7 +124,7 @@ export type RecoveryFormState = {
   message?: string;
   fieldErrors?: RecoveryFieldErrors;
   /** Devolvidos no erro para o formulário não perder o que foi digitado. */
-  cnpj?: string;
+  companySlug?: string;
   email?: string;
 };
 

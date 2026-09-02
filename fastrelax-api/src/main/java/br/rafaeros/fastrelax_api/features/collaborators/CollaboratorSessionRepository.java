@@ -93,4 +93,14 @@ public interface CollaboratorSessionRepository extends CompanyScopedRepository<C
 
     /** Agenda de um dia inteiro, base do resumo enviado na véspera. */
     List<CollaboratorSession> findBySessionDateAndStatus(LocalDate sessionDate, SessionStatus status);
+
+    /**
+     * Sessão em andamento numa cadeira específica, se houver.
+     *
+     * <p>
+     * Usada quando a Physical desativa a cadeira: sem isto não haveria como
+     * saber se tem alguém sentado nela naquele instante para encerrar a sessão
+     * junto do corte de energia.
+     */
+    Optional<CollaboratorSession> findByChairIdAndStatus(Long chairId, SessionStatus status);
 }

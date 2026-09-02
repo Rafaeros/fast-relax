@@ -36,17 +36,24 @@ public class CollaboratorCredentialAccount implements CredentialAccount {
     }
 
     /**
-     * O e-mail do colaborador é único dentro da empresa, não globalmente — a
-     * mesma pessoa pode ser colaboradora de dois clientes. Sem o
-     * {@code companyId} a busca seria ambígua, então ele é obrigatório aqui.
+     * O e-mail não é mais único dentro da empresa — só o CPF é. Duas pessoas
+     * podem compartilhar endereço; a recuperação cai sempre no cadastro mais
+     * recente entre os ativos, e quem não é o dono pede de novo depois de o RH
+     * corrigir o cadastro duplicado.
+     *
+     * <p>
+     * Sem o {@code companyId} a busca seria ambígua entre clientes, então ele é
+     * obrigatório aqui.
      */
     @Override
     public Optional<CredentialHolder> findByEmail(String email, Long companyId) {
         if (companyId == null) {
             return Optional.empty();
         }
-        return collaboratorRepository.findByCompanyIdAndEmailIgnoreCase(companyId, email)
+        return collaboratorRepository.findByCompanyIdAndEmailIgnoreCaseOrderByCreatedAtDesc(companyId, email)
+                .stream()
                 .filter(Collaborator::isEnabled)
+                .findFirst()
                 .map(CredentialHolder.class::cast);
     }
 

@@ -23,7 +23,7 @@ public record UpdateCollaboratorDTO(
     @Cpf
     String cpf,
 
-    @NotBlank(message = "O telefone é obrigatório")
+    /** Em branco remove o telefone do cadastro, como o e-mail. */
     @Size(max = 20, message = "O telefone deve ter no máximo 20 caracteres")
     String phoneNumber,
 

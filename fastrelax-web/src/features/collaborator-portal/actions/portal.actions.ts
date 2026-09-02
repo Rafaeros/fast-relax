@@ -26,28 +26,28 @@ const AGENDA = "/colaborador/agenda";
 const DEFINE_PASSWORD = "/colaborador/definir-senha";
 
 /**
- * Login do colaborador: CNPJ da empresa, CPF e senha.
+ * Login do colaborador: slug da empresa, CPF e senha.
  *
- * O CPF identifica, a senha autentica. O CNPJ entra porque o CPF só é único
+ * O CPF identifica, a senha autentica. O slug entra porque o CPF só é único
  * dentro da empresa — a mesma pessoa pode ser colaboradora de dois clientes.
  */
 export async function collaboratorLoginAction(
   _previousState: CollaboratorLoginFormState,
   formData: FormData,
 ): Promise<CollaboratorLoginFormState> {
-  // A máscara é da interface; a API espera só dígitos. Os valores originais
-  // voltam no estado de erro para o formulário não perder o que foi digitado —
-  // a senha fica de fora, e é o único campo que a pessoa refaz.
-  const typedCnpj = String(formData.get("cnpj") ?? "");
+  // Os valores originais voltam no estado de erro para o formulário não
+  // perder o que foi digitado — a senha fica de fora, e é o único campo que a
+  // pessoa refaz.
+  const typedSlug = String(formData.get("companySlug") ?? "");
   const typedCpf = String(formData.get("cpf") ?? "");
-  const cnpj = onlyDigits(typedCnpj);
+  const companySlug = typedSlug.trim().toLowerCase();
   const cpf = onlyDigits(typedCpf);
   const password = String(formData.get("password") ?? "");
 
-  const typed = { cnpj: typedCnpj, cpf: typedCpf };
+  const typed = { companySlug: typedSlug, cpf: typedCpf };
 
   const fieldErrors: CollaboratorLoginFieldErrors = {};
-  if (cnpj.length !== 14) fieldErrors.cnpj = "Informe os 14 dígitos do CNPJ.";
+  if (!companySlug) fieldErrors.companySlug = "Informe o identificador da empresa.";
   if (cpf.length !== 11) fieldErrors.cpf = "Informe os 11 dígitos do CPF.";
   if (!password) fieldErrors.password = "Informe sua senha.";
 
@@ -55,7 +55,7 @@ export async function collaboratorLoginAction(
     return { status: "error", message: "Confira os campos destacados.", fieldErrors, ...typed };
   }
 
-  const result = await collaboratorSignIn({ cnpj, cpf, password });
+  const result = await collaboratorSignIn({ companySlug, cpf, password });
 
   if (!result.ok) {
     // A API responde a mesma mensagem para empresa inexistente, CPF que não

@@ -34,12 +34,17 @@ final class CollaboratorSheetBuilder {
      * senha temporária em vez de convite.
      */
     static final String[] HEADERS = {
-            "Nome", "CPF", "Telefone", "Departamento", "Inicio Almoco", "Fim Almoco", "Email"
+            "Nome", "CPF", "Telefone", "Departamento", "Horario Permitido Inicio",
+            "Horario Permitido Fim", "Email"
     };
 
-    /** Exemplo com máscara: comunica que CPF e telefone podem vir formatados. */
+    /**
+     * Exemplo com máscara: comunica que CPF e telefone podem vir formatados.
+     * Telefone e e-mail entram opcionais de propósito — quem não tiver o dado
+     * deixa a célula em branco, sem quebrar a importação.
+     */
     static final String[] SAMPLE = {
-            "Renata Perez", "123.456.789-00", "(43) 98412-8306", "Recursos Humanos", "12:00", "13:00",
+            "Renata Perez", "123.456.789-00", "(43) 98412-8306", "Recursos Humanos", "08:00", "18:00",
             "renata.perez@empresa.com"
     };
 

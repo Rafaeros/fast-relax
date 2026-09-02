@@ -20,7 +20,7 @@ public record CreateCollaboratorRequestDTO(
     @Cpf
     String cpf,
 
-    @NotBlank(message = "O telefone é obrigatório")
+    /** Opcional, como o e-mail: parte do quadro não tem telefone cadastrado. */
     @Size(max = 20, message = "O telefone deve ter no máximo 20 caracteres")
     String phoneNumber,
 

@@ -101,6 +101,7 @@ export async function deleteCompanyAction(id: number): Promise<MutationResult> {
 function readAndValidate(formData: FormData) {
   return validateCompanyInput({
     cnpj: String(formData.get("cnpj") ?? ""),
+    slug: String(formData.get("slug") ?? ""),
     name: String(formData.get("name") ?? ""),
     email: String(formData.get("email") ?? ""),
     phone: String(formData.get("phone") ?? ""),
@@ -115,15 +116,22 @@ function readAndValidate(formData: FormData) {
 }
 
 /**
- * CNPJ e e-mail duplicados são decididos pelo backend (`BusinessException` →
- * 400): sem campo identificado na resposta, a mensagem cai no CNPJ, que é o
- * conflito mais provável.
+ * CNPJ, slug e e-mail duplicados são decididos pelo backend (`BusinessException`
+ * → 400): sem campo identificado na resposta, a mensagem menciona qual deles
+ * colidiu, e cai no CNPJ só quando nem isso dá para saber.
  */
 function errorState(message: string, errors: string[]): CompanyFormState {
   const fieldErrors = mapCompanyApiErrors(errors);
 
   if (Object.keys(fieldErrors).length === 0) {
-    fieldErrors.cnpj = message;
+    const lower = message.toLowerCase();
+    if (lower.includes("slug")) {
+      fieldErrors.slug = message;
+    } else if (lower.includes("email")) {
+      fieldErrors.email = message;
+    } else {
+      fieldErrors.cnpj = message;
+    }
   }
 
   return { status: "error", message, fieldErrors };

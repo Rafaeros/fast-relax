@@ -30,7 +30,7 @@ public class AuthController {
     }
 
     @PostMapping("/collaborator/login")
-    @Operation(summary = "Login de colaborador por CNPJ da empresa, CPF e senha")
+    @Operation(summary = "Login de colaborador por slug da empresa, CPF e senha")
     public ResponseEntity<ApiResponseDTO<CollaboratorLoginResponseDTO>> collaboratorLogin(
             @RequestBody @Valid CollaboratorLoginRequestDTO data, HttpServletRequest request) {
         CollaboratorLoginResponseDTO response = authService.collaboratorLogin(data, clientKey(request));

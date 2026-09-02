@@ -39,7 +39,7 @@ function formatCountdown(seconds: number) {
 export function CurrentSessionCard({ session }: CurrentSessionCardProps) {
   const [pending, startTransition] = useTransition();
   const { success, error } = useToast();
-  
+
   // Para evitar erro de hydration (servidor e cliente renderizando tempos
   // diferentes por conta do delay da rede), só ativamos o timer no cliente.
   const [now, setNow] = useState<number | null>(null);
@@ -49,7 +49,7 @@ export function CurrentSessionCard({ session }: CurrentSessionCardProps) {
     setNow(Date.now());
 
     if (session?.status !== "STARTED" || !session.startedAt) return;
-    
+
     // Sincroniza o relógio a cada segundo
     const interval = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(interval);
@@ -150,7 +150,7 @@ export function CurrentSessionCard({ session }: CurrentSessionCardProps) {
     // abre o app para ver, e o contraste com os cartões neutros a destaca.
     <Card
       padding="lg"
-      className="flex flex-col gap-5 border-accent/30 bg-gradient-to-br from-accent-strong/25 via-surface-card to-surface-card"
+      className="flex flex-col gap-5 border-accent/30 bg-linear-to-br from-accent-strong/25 via-surface-card to-surface-card"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex flex-col gap-1">

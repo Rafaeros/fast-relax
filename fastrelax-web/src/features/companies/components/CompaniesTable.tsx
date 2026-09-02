@@ -15,7 +15,6 @@ import {
 } from "@/components/ui";
 import type { DataTableColumn } from "@/components/ui";
 import type { PageSlice } from "@/lib/api/pagination.types";
-import { formatCnpj } from "@/lib/format";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import {
   deleteCompanyAction,
@@ -63,7 +62,7 @@ export function CompaniesTable({ initialSlice, states, loadPage }: CompaniesTabl
       // A pontuação sai dos dois lados: quem digita "12.345" procura o número,
       // e o CNPJ só existe em dígitos na resposta da API.
       const term = strip(debouncedSearch);
-      const haystack = strip(`${company.name} ${company.cnpj} ${company.email}`);
+      const haystack = strip(`${company.name} ${company.cnpj} ${company.slug} ${company.email}`);
 
       if (term && !haystack.includes(term)) return false;
       if (filters.active !== undefined && company.active !== filters.active) return false;
@@ -85,7 +84,7 @@ export function CompaniesTable({ initialSlice, states, loadPage }: CompaniesTabl
       {
         id: "name",
         header: "Razão social",
-        cell: (row) => <TableIdentity name={row.name} secondary={formatCnpj(row.cnpj)} />,
+        cell: (row) => <TableIdentity name={row.name} secondary={row.slug} />,
       },
       {
         id: "city",
@@ -179,7 +178,7 @@ export function CompaniesTable({ initialSlice, states, loadPage }: CompaniesTabl
         }
         toolbar={
           <TableToolbar
-            searchPlaceholder="Buscar por razão social ou CNPJ"
+            searchPlaceholder="Buscar por razão social, CNPJ ou slug"
             searchValue={search}
             onSearchChange={setSearch}
             filter={<CompaniesFilterModal value={filters} onApply={setFilters} />}

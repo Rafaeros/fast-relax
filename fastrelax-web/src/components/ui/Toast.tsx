@@ -63,7 +63,15 @@ const DEFAULT_DURATION = 5000;
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const nextId = useRef(0);
-  const layerRef = useRef<HTMLDivElement>(null);
+  const layerRef = useRef<HTMLDivElement & HTMLDialogElement>(null);
+  // Assume suportado até o efeito abaixo confirmar do lado do cliente — o
+  // primeiro toast só chega bem depois da hidratação, então o valor de SSR
+  // não tem chance de aparecer errado na tela.
+  const [popoverSupported, setPopoverSupported] = useState(true);
+
+  useEffect(() => {
+    setPopoverSupported(typeof HTMLElement !== "undefined" && "showPopover" in HTMLElement.prototype);
+  }, []);
 
   const dismiss = useCallback((id: number) => {
     setToasts((current) => current.filter((entry) => entry.id !== id));
@@ -85,23 +93,41 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   /*
     O Modal usa <dialog>.showModal(), que sobe o elemento para a top layer do
     browser — lá o z-index do resto da página não alcança. Como popover, o
-    container do toast entra na mesma camada.
+    container do toast entra na mesma camada, sem herdar a modalidade do
+    <dialog> (fica sem backdrop, sem prender o foco, sem travar o resto da
+    página).
 
     Mostrar só quando há aviso (e esconder ao esvaziar) importa: a ordem dentro
     da top layer é a ordem de promoção, então promover na hora do aviso deixa o
     toast acima de um modal que já estava aberto.
+
+    Popover tem suporte mais novo que <dialog> — um WebView Android antigo ou
+    Safari < 17 abrem o Modal (que já funciona há anos) mas não reconhecem
+    `popover`, e o toast sem essa API fica preso no stacking context normal,
+    sempre atrás do modal aberto. Nesses casos o fallback usa o próprio
+    <dialog>: perde a independência (a página fica inerte enquanto o aviso
+    aparece), mas garante que o toast pelo menos é visto.
   */
   useEffect(() => {
     const layer = layerRef.current;
-    if (!layer || !("showPopover" in layer)) return;
+    if (!layer) return;
 
-    const open = layer.matches(":popover-open");
-    if (toasts.length > 0 && !open) {
-      layer.showPopover();
-    } else if (toasts.length === 0 && open) {
-      layer.hidePopover();
+    if (popoverSupported) {
+      const open = layer.matches(":popover-open");
+      if (toasts.length > 0 && !open) {
+        layer.showPopover();
+      } else if (toasts.length === 0 && open) {
+        layer.hidePopover();
+      }
+      return;
     }
-  }, [toasts.length]);
+
+    if (toasts.length > 0 && !layer.open) {
+      layer.showModal();
+    } else if (toasts.length === 0 && layer.open) {
+      layer.close();
+    }
+  }, [toasts.length, popoverSupported]);
 
   const value = useMemo<ToastContextValue>(
     () => ({
@@ -131,23 +157,39 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         O container fica acima da barra de abas do mobile — sobrepor o toast à
         navegação esconderia os dois. As classes de reset (borda, fundo, padding,
         tamanho, margem) desfazem o estilo padrão que o browser aplica a
-        [popover]; sem elas o aviso ganha moldura branca e vai para o centro.
+        [popover] e a <dialog>; sem elas o aviso ganha moldura branca e vai
+        para o centro.
       */}
-      <div
-        ref={layerRef}
-        popover="manual"
-        className="pointer-events-none fixed inset-x-0 top-auto z-[60] m-0 h-auto w-auto overflow-visible border-0 bg-transparent p-0 px-4 text-inherit flex flex-col items-center gap-2 sm:inset-x-auto sm:right-4 sm:items-end"
-        style={{
-          bottom: "calc(4.5rem + env(safe-area-inset-bottom))",
-        }}
-      >
-        {toasts.map((entry) => (
-          <ToastItem key={entry.id} toast={entry} onDismiss={dismiss} />
-        ))}
-      </div>
+      {popoverSupported ? (
+        <div ref={layerRef} popover="manual" className={LAYER_CLASS} style={LAYER_STYLE}>
+          {toasts.map((entry) => (
+            <ToastItem key={entry.id} toast={entry} onDismiss={dismiss} />
+          ))}
+        </div>
+      ) : (
+        <dialog
+          ref={layerRef}
+          aria-label="Avisos"
+          // O fechamento é decidido pelo estado dos toasts, não pelo usuário —
+          // sem isto, ESC fecharia o <dialog> e deixaria a página inerte (modal
+          // "aberto" para o browser) enquanto o React ainda acha que há avisos.
+          onCancel={(event) => event.preventDefault()}
+          className={cn(LAYER_CLASS, "max-w-none backdrop:bg-transparent")}
+          style={LAYER_STYLE}
+        >
+          {toasts.map((entry) => (
+            <ToastItem key={entry.id} toast={entry} onDismiss={dismiss} />
+          ))}
+        </dialog>
+      )}
     </ToastContext.Provider>
   );
 }
+
+const LAYER_CLASS =
+  "pointer-events-none fixed inset-x-0 top-auto z-[60] m-0 h-auto w-auto overflow-visible border-0 bg-transparent p-0 px-4 text-inherit flex flex-col items-center gap-2 sm:inset-x-auto sm:right-4 sm:items-end";
+
+const LAYER_STYLE = { bottom: "calc(4.5rem + env(safe-area-inset-bottom))" };
 
 function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: number) => void }) {
   const { icon, className } = TONE_STYLES[toast.tone];

@@ -118,7 +118,7 @@ export function ChairFormFields({
         options={[
           { label: "Não informado", value: "" },
           ...firmwares.map((firmware) => ({
-            label: ` — `,
+            label: `${firmware.productName} — ${firmware.version}`,
             value: String(firmware.id),
           })),
         ]}

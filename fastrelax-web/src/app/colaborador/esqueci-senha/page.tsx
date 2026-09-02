@@ -11,9 +11,10 @@ export const metadata: Metadata = {
  * Recuperação do colaborador.
  *
  * <p>
- * Pede o CNPJ além do e-mail: o e-mail dele só é único dentro da empresa, e a
- * mesma pessoa pode ser colaboradora de dois clientes. É o mesmo CNPJ que ela
- * digita para entrar, então não há informação nova a pedir.
+ * Pede o identificador da empresa além do e-mail: o e-mail dele só é único
+ * dentro da empresa, e a mesma pessoa pode ser colaboradora de dois clientes.
+ * É o mesmo identificador que ela digita para entrar, então não há
+ * informação nova a pedir.
  */
 export default function ColaboradorEsqueciSenhaPage() {
   return (
@@ -37,7 +38,7 @@ export default function ColaboradorEsqueciSenhaPage() {
           <span className="eyebrow">Recuperação de senha</span>
           <h1 className="font-display text-3xl text-ink-primary">Esqueceu a senha?</h1>
           <p className="text-sm leading-relaxed text-ink-secondary">
-            Informe o CNPJ da empresa e o e-mail do seu cadastro para receber o link.
+            Informe o identificador da empresa e o e-mail do seu cadastro para receber o link.
           </p>
         </div>
 

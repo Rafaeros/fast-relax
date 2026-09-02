@@ -126,7 +126,7 @@ public class CollaboratorService {
 
         collaborator.setDepartment(findDepartment(dto.departmentId()));
         collaborator.setName(dto.name());
-        collaborator.setPhoneNumber(PhoneUtils.normalize(dto.phoneNumber()));
+        applyPhone(collaborator, dto.phoneNumber());
         applyEmail(collaborator, dto.email());
 
         // Vale tanto para o cadastro novo quanto para a reativação: quem volta não
@@ -144,27 +144,20 @@ public class CollaboratorService {
      * Grava o e-mail, em branco vira nulo.
      *
      * <p>
-     * String vazia não pode chegar ao banco: o índice único ignora nulos, mas
-     * trataria dois vazios como colisão — e o segundo colaborador sem e-mail
-     * seria recusado por um conflito que não existe.
+     * Não é mais checado contra os demais colaboradores: só o CPF identifica de
+     * forma única dentro da empresa. Duas pessoas podem compartilhar e-mail — a
+     * recuperação de senha resolve o mais recente entre os ativos nesse caso.
      */
     private void applyEmail(Collaborator collaborator, String rawEmail) {
         String email = rawEmail == null ? "" : rawEmail.trim().toLowerCase();
+        collaborator.setEmail(email.isEmpty() ? null : email);
+    }
 
-        if (email.isEmpty()) {
-            collaborator.setEmail(null);
-            return;
-        }
-
-        collaboratorRepository
-                .findByCompanyIdAndEmailIgnoreCaseAndIdNot(
-                        currentTenant.companyId(), email,
-                        collaborator.getId() == null ? -1L : collaborator.getId())
-                .ifPresent(other -> {
-                    throw new BusinessException("Já existe um colaborador com este e-mail");
-                });
-
-        collaborator.setEmail(email);
+    /** Grava o telefone, em branco vira nulo — mesma reconciliação do e-mail. */
+    private void applyPhone(Collaborator collaborator, String rawPhone) {
+        collaborator.setPhoneNumber(rawPhone == null || rawPhone.isBlank()
+                ? null
+                : PhoneUtils.normalize(rawPhone));
     }
 
     @Transactional
@@ -174,7 +167,7 @@ public class CollaboratorService {
 
         collaborator.setDepartment(findDepartment(dto.departmentId()));
         collaborator.setName(dto.name());
-        collaborator.setPhoneNumber(PhoneUtils.normalize(dto.phoneNumber()));
+        applyPhone(collaborator, dto.phoneNumber());
         collaborator.setActive(dto.active());
         applyEmail(collaborator, dto.email());
         applyCpfChange(collaborator, dto.cpf());

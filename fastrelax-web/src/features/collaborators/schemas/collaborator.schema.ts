@@ -70,9 +70,8 @@ export function validateCollaboratorInput(input: {
     fieldErrors.cpf = "CPF inválido.";
   }
 
-  if (!phoneNumber) {
-    fieldErrors.phoneNumber = "Informe o telefone.";
-  } else if (phoneNumber.length < 10) {
+  // Campo opcional, como o e-mail: só é validado quando preenchido.
+  if (phoneNumber && phoneNumber.length < 10) {
     fieldErrors.phoneNumber = "Telefone incompleto.";
   }
 
@@ -84,7 +83,10 @@ export function validateCollaboratorInput(input: {
     return { valid: false, fieldErrors };
   }
 
-  return { valid: true, data: { name, cpf, phoneNumber, email: email || undefined, departmentId } };
+  return {
+    valid: true,
+    data: { name, cpf, phoneNumber: phoneNumber || undefined, email: email || undefined, departmentId },
+  };
 }
 
 export type UpdateValidation =
@@ -124,9 +126,8 @@ export function validateCollaboratorUpdateInput(input: {
     fieldErrors.cpf = "CPF inválido.";
   }
 
-  if (!phoneNumber) {
-    fieldErrors.phoneNumber = "Informe o telefone.";
-  } else if (phoneNumber.length < 10) {
+  // Campo opcional, como o e-mail: só é validado quando preenchido.
+  if (phoneNumber && phoneNumber.length < 10) {
     fieldErrors.phoneNumber = "Telefone incompleto.";
   }
 
@@ -140,7 +141,7 @@ export function validateCollaboratorUpdateInput(input: {
 
   return {
     valid: true,
-    // String vazia viaja de propósito: é assim que a edição remove o e-mail.
+    // String vazia viaja de propósito: é assim que a edição remove telefone e e-mail.
     data: { name, cpf, phoneNumber, email, departmentId, active: input.active === "true" },
   };
 }
@@ -195,6 +196,9 @@ export function mapApiFieldErrors(errors: string[]): CollaboratorFieldErrors {
         break;
       case "phoneNumber":
         fieldErrors.phoneNumber = message;
+        break;
+      case "email":
+        fieldErrors.email = message;
         break;
       case "departmentId":
         fieldErrors.departmentId = message;
