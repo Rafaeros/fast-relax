@@ -121,6 +121,7 @@ public class CollaboratorSessionService {
 
         int durationMinutes = sessionSettingsService.getDefaultDurationMinutes();
         int maxAdvanceDays = sessionSettingsService.getMaxAdvanceDays();
+        int stabilizationMinutes = sessionSettingsService.getStabilizationMinutes();
 
         LocalDate today = LocalDate.now();
         LocalDate lastBookable = today.plusDays(maxAdvanceDays);
@@ -144,10 +145,11 @@ public class CollaboratorSessionService {
 
         List<AvailableDayDTO> days = new ArrayList<>();
         for (LocalDate date = start; !date.isAfter(end); date = date.plusDays(1)) {
-            buildDay(targetId, date, durationMinutes, busy, activeChairs).ifPresent(day -> days.add(day));
+            buildDay(targetId, date, durationMinutes, stabilizationMinutes, busy, activeChairs)
+                    .ifPresent(day -> days.add(day));
         }
 
-        return new AvailableSlotsResponseDTO(start, end, durationMinutes, maxAdvanceDays, days);
+        return new AvailableSlotsResponseDTO(start, end, durationMinutes, stabilizationMinutes, maxAdvanceDays, days);
     }
 
     /**
@@ -160,7 +162,7 @@ public class CollaboratorSessionService {
      * dia que o colaborador não trabalha.
      */
     private Optional<AvailableDayDTO> buildDay(Long collaboratorId, LocalDate date, int durationMinutes,
-            List<CollaboratorSession> busy, List<AvailableChairDTO> activeChairs) {
+            int stabilizationMinutes, List<CollaboratorSession> busy, List<AvailableChairDTO> activeChairs) {
         Optional<WorkDay> workDay = WorkDay.from(date);
         if (workDay.isEmpty()) {
             return Optional.empty();
@@ -177,29 +179,68 @@ public class CollaboratorSessionService {
                 .toList();
 
         List<SessionSlotDTO> slots = new ArrayList<>();
-        LocalTime slotStart = window.getAllowedStartTime();
-        LocalTime slotEnd = slotStart.plusMinutes(durationMinutes);
 
-        // Para enquanto o slot inteiro couber na janela permitida; o teste de isAfter
-        // também
-        // encerra o laço se a soma cruzar a meia-noite.
-        while (!slotEnd.isAfter(window.getAllowedEndTime()) && slotEnd.isAfter(slotStart)) {
+        for (LocalTime slotStart : dayGrid(window, durationMinutes, stabilizationMinutes)) {
             // Horário que já passou some da grade em vez de aparecer desabilitado:
             // não é escolha possível nem informação útil. Ocupado é diferente —
             // continua na lista para a tela mostrar que o horário existe e está
             // tomado por outra pessoa.
-            if (!hasPassed(slotStart, date)) {
-                slots.add(new SessionSlotDTO(slotStart, slotEnd,
-                        getAvailableChairs(slotStart, slotEnd, busyOnDate, activeChairs)));
+            if (hasPassed(slotStart, date)) {
+                continue;
             }
-            slotStart = slotEnd;
-            slotEnd = slotStart.plusMinutes(durationMinutes);
+
+            LocalTime slotEnd = slotStart.plusMinutes(durationMinutes);
+            slots.add(new SessionSlotDTO(slotStart, slotEnd,
+                    getAvailableChairs(slotStart, slotEnd, busyOnDate, activeChairs, stabilizationMinutes)));
         }
 
         return slots.isEmpty()
                 ? Optional.empty()
                 : Optional.of(new AvailableDayDTO(date, window.getDayOfWeek(), window.getAllowedStartTime(),
                         window.getAllowedEndTime(), slots));
+    }
+
+    /**
+     * Horários de início do dia: da abertura da janela do colaborador em
+     * diante, de {@code duração + estabilização} em
+     * {@code duração + estabilização}.
+     *
+     * <p>
+     * A folga entra no passo porque não é um detalhe de conflito, é parte do
+     * ciclo da cadeira. Com 5 min de duração e 1 min de folga, a sessão das
+     * 12:05 termina 12:10 e o próximo início possível é <b>12:11</b> — 12:10
+     * não existe como horário. A grade anterior andava só pela duração e
+     * escondia depois o que estivesse ocupado, o que produzia a lista torta que
+     * a tela mostrava: 12:10 oferecido para uma cadeira e 12:11 para outra, no
+     * mesmo dia.
+     *
+     * <p>
+     * A grade é por colaborador porque a janela permitida é dele. Ancorá-la na
+     * abertura da própria janela é o que garante que duas pessoas com janelas
+     * diferentes recebam cada uma horários que cabem inteiros no seu período.
+     */
+    private List<LocalTime> dayGrid(CollaboratorWorkSchedule window, int durationMinutes, int stabilizationMinutes) {
+        List<LocalTime> starts = new ArrayList<>();
+        int step = durationMinutes + stabilizationMinutes;
+
+        LocalTime tick = window.getAllowedStartTime();
+        while (true) {
+            LocalTime tickEnd = tick.plusMinutes(durationMinutes);
+            // tickEnd para trás é virada de meia-noite; depois do fim permitido
+            // é sessão que não cabe na janela. Nos dois casos a grade acabou.
+            if (!tickEnd.isAfter(tick) || tickEnd.isAfter(window.getAllowedEndTime())) {
+                break;
+            }
+            starts.add(tick);
+
+            LocalTime next = tick.plusMinutes(step);
+            if (!next.isAfter(tick)) {
+                break; // virou a meia-noite
+            }
+            tick = next;
+        }
+
+        return starts;
     }
 
     @Transactional
@@ -221,6 +262,7 @@ public class CollaboratorSessionService {
         validateWithinAllowedWindow(dto.collaboratorId(), dto.sessionDate(), dto.startTime(), endTime);
         requireNoActiveSession(dto.collaboratorId());
         requireSlotFree(dto.sessionDate(), dto.startTime(), endTime, null);
+        requireChairStabilized(dto.chairId(), dto.sessionDate(), dto.startTime(), endTime, null);
 
         CollaboratorSession session = new CollaboratorSession();
         // A empresa vem do colaborador, não do contexto: assim a sessão nunca pode
@@ -255,6 +297,8 @@ public class CollaboratorSessionService {
         validateWindow(dto.sessionDate(), dto.startTime(), endTime);
         validateWithinAllowedWindow(session.getCollaborator().getId(), dto.sessionDate(), dto.startTime(), endTime);
         requireSlotFree(dto.sessionDate(), dto.startTime(), endTime, session.getId());
+        requireChairStabilized(session.getChair().getId(), dto.sessionDate(), dto.startTime(), endTime,
+                session.getId());
 
         session.setSessionDate(dto.sessionDate());
         session.setStartTime(dto.startTime());
@@ -292,8 +336,13 @@ public class CollaboratorSessionService {
      * parado.
      */
     private CollaboratorSessionResponseDTO beginSession(CollaboratorSession session) {
-        int durationSeconds = (int) java.time.Duration
-                .between(session.getStartTime(), session.getEndTime()).getSeconds();
+        // Contado a partir de agora até o fim agendado, não a duração nominal:
+        // quem começa atrasado (dentro da tolerância) faz uma massagem mais curta
+        // em vez de empurrar o desligamento — e com ele a folga de estabilização
+        // da próxima sessão — para depois do horário previsto.
+        LocalDateTime scheduledEnd = LocalDateTime.of(session.getSessionDate(), session.getEndTime());
+        int durationSeconds = (int) Math.max(1,
+                java.time.Duration.between(LocalDateTime.now(), scheduledEnd).getSeconds());
         session.setChair(chairCommandService.startFor(session.getId(), durationSeconds));
 
         session.setStatus(SessionStatus.STARTED);
@@ -440,6 +489,54 @@ public class CollaboratorSessionService {
         }
     }
 
+    /**
+     * A folga de estabilização é por cadeira: o relé precisa desarmar e a
+     * poltrona assentar antes do próximo ciclo, então duas sessões que só
+     * "encostam" no papel (uma termina exatamente quando a outra começa nessa
+     * mesma cadeira) não são seguras mesmo passando por
+     * {@link #requireSlotFree}, que só olha capacidade agregada.
+     *
+     * <p>
+     * A folga é aplicada nos dois lados da sessão candidata — cobre tanto
+     * "essa cadeira acabou de ser usada" quanto "essa cadeira já tem outra
+     * sessão marcada logo depois" — e por isso basta alargar a janela
+     * candidata em vez de cada sessão existente.
+     */
+    private void requireChairStabilized(Long chairId, LocalDate sessionDate, LocalTime startTime, LocalTime endTime,
+            Long excludeId) {
+        int stabilizationMinutes = sessionSettingsService.getStabilizationMinutes();
+        if (stabilizationMinutes <= 0) {
+            return;
+        }
+
+        LocalTime paddedStart = padBefore(startTime, stabilizationMinutes);
+        LocalTime paddedEnd = padAfter(endTime, stabilizationMinutes);
+
+        long conflicting = sessionRepository.countOverlappingChair(chairId, sessionDate, ACTIVE_STATUSES,
+                excludeId != null ? excludeId : -1L, paddedStart, paddedEnd);
+
+        if (conflicting > 0) {
+            throw new BusinessException("Esta cadeira precisa de " + stabilizationMinutes
+                    + " min entre uma sessão e outra para estabilizar. Escolha outro horário ou outra cadeira.");
+        }
+    }
+
+    /**
+     * {@code minusMinutes} sem voltar ao dia anterior — perto da meia-noite, a
+     * folga de estabilização é ignorada daquele lado em vez de comparar contra
+     * o dia errado.
+     */
+    private static LocalTime padBefore(LocalTime time, int minutes) {
+        LocalTime padded = time.minusMinutes(minutes);
+        return padded.isAfter(time) ? LocalTime.MIN : padded;
+    }
+
+    /** Mesma ideia de {@link #padBefore}, para o lado de depois da meia-noite. */
+    private static LocalTime padAfter(LocalTime time, int minutes) {
+        LocalTime padded = time.plusMinutes(minutes);
+        return padded.isBefore(time) ? LocalTime.MAX : padded;
+    }
+
     private void requireNoActiveSession(Long collaboratorId) {
         sessionRepository.findByCollaboratorIdAndStatusIn(collaboratorId, ACTIVE_STATUSES)
                 .ifPresent(active -> {
@@ -457,6 +554,14 @@ public class CollaboratorSessionService {
      * A sessão só pode ser iniciada no dia e dentro da janela em que foi agendada:
      * de {@code startTime} até {@code startTime + tolerância}. Sem isto, dava para
      * iniciar dias antes e ocupar o recurso fora do horário reservado.
+     *
+     * <p>
+     * A janela não abre antes do horário agendado. Adiantar o início só teria
+     * duas saídas, ambas erradas: encerrar no fim agendado (massagem menor que a
+     * duração contratada) ou rodar a duração cheia a partir do início real,
+     * comendo a folga de estabilização e o começo de quem vem depois na mesma
+     * cadeira. Atraso, ao contrário, é tolerado — o custo fica com quem se
+     * atrasou, em {@link #beginSession}.
      */
     private void validateStartWindow(CollaboratorSession session) {
         LocalDate today = LocalDate.now();
@@ -468,17 +573,9 @@ public class CollaboratorSessionService {
 
         LocalTime now = LocalTime.now();
 
-        // Quem chega adiantado pode começar antes: sem esta folga, a pessoa ficaria
-        // parada em frente à cadeira esperando o relógio virar.
-        LocalTime opensAt = session.getStartTime()
-                .minusMinutes(sessionSettingsService.getEarlyStartMinutes());
-        // opensAt depois do início significa virada de dia; nesse caso a janela
-        // abre à meia-noite e não há como estar adiantado.
-        boolean crossesMidnight = opensAt.isAfter(session.getStartTime());
-
-        if (!crossesMidnight && now.isBefore(opensAt)) {
+        if (now.isBefore(session.getStartTime())) {
             throw new BusinessException("A sessão só pode ser iniciada a partir das "
-                    + opensAt.format(TIME_FORMAT) + ".");
+                    + session.getStartTime().format(TIME_FORMAT) + ".");
         }
 
         LocalTime deadline = session.getStartTime()
@@ -527,7 +624,6 @@ public class CollaboratorSessionService {
         return sessionDate.isEqual(LocalDate.now()) && !slotStart.isAfter(LocalTime.now());
     }
 
-    /** Livre quando nenhuma sessão ativa se sobrepõe ao intervalo. */
     /**
      * Livre enquanto sobrar cadeira no horário.
      *
@@ -535,13 +631,22 @@ public class CollaboratorSessionService {
      * Deixou de ser "ninguém marcou" e passou a ser contagem quando uma empresa
      * pôde ter várias cadeiras — com duas, o segundo agendamento das 12:00 é
      * legítimo, e recusá-lo desperdiçaria metade do parque.
+     *
+     * <p>
+     * O slot é alargado pela folga de estabilização antes de comparar: sem
+     * isso, a grade mostraria uma cadeira como livre no minuto exato em que a
+     * sessão anterior termina nela, quando na prática ainda falta o tempo de
+     * desarmar o relé.
      */
     private List<AvailableChairDTO> getAvailableChairs(LocalTime start, LocalTime end, List<CollaboratorSession> busy,
-            List<AvailableChairDTO> activeChairs) {
+            List<AvailableChairDTO> activeChairs, int stabilizationMinutes) {
+        LocalTime paddedStart = padBefore(start, stabilizationMinutes);
+        LocalTime paddedEnd = padAfter(end, stabilizationMinutes);
+
         List<AvailableChairDTO> availableChairs = new ArrayList<>(activeChairs);
         for (CollaboratorSession session : busy) {
-            // Se a sessão conflita com o slot
-            if (session.getStartTime().isBefore(end) && session.getEndTime().isAfter(start)) {
+            // Se a sessão (com a folga) conflita com o slot
+            if (session.getStartTime().isBefore(paddedEnd) && session.getEndTime().isAfter(paddedStart)) {
                 if (session.getChair() != null) {
                     availableChairs.removeIf(c -> c.id().equals(session.getChair().getId()));
                 }
@@ -562,8 +667,14 @@ public class CollaboratorSessionService {
 
     /**
      * A sessão precisa caber inteira na janela de horário permitido configurada
-     * para aquele
-     * dia da semana — é a razão de {@code CollaboratorWorkSchedule} existir.
+     * para aquele dia da semana — é a razão de {@code CollaboratorWorkSchedule}
+     * existir — e começar num tique da grade daquela janela.
+     *
+     * <p>
+     * A checagem da grade não é redundante com a da janela: sem ela, um POST
+     * com um horário que a tela nunca ofereceu (12:10, no exemplo de
+     * {@link #dayGrid}) passaria por tudo e voltaria a encostar duas sessões na
+     * mesma cadeira. A grade só vale como regra se o servidor a impuser.
      */
     private void validateWithinAllowedWindow(Long collaboratorId, LocalDate sessionDate, LocalTime startTime,
             LocalTime endTime) {
@@ -573,6 +684,15 @@ public class CollaboratorSessionService {
             throw new BusinessException("A sessão deve ficar dentro do horário permitido ("
                     + schedule.getAllowedStartTime() + " às " + schedule.getAllowedEndTime()
                     + "); o horário solicitado vai de " + startTime + " a " + endTime);
+        }
+
+        int durationMinutes = sessionSettingsService.getDefaultDurationMinutes();
+        int stabilizationMinutes = sessionSettingsService.getStabilizationMinutes();
+        if (!dayGrid(schedule, durationMinutes, stabilizationMinutes).contains(startTime)) {
+            throw new BusinessException("O horário " + startTime.format(TIME_FORMAT)
+                    + " não é um horário oferecido. Escolha um da lista: ela já respeita os "
+                    + durationMinutes + " min de sessão mais " + stabilizationMinutes
+                    + " min de estabilização da cadeira.");
         }
     }
 

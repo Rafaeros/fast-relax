@@ -110,6 +110,8 @@ export type AvailableSlots = {
   from: string;
   to: string;
   durationMinutes: number;
+  /** Folga entre o fim de uma sessão e o início da próxima na mesma cadeira. */
+  stabilizationMinutes: number;
   maxAdvanceDays: number;
   days: AvailableDay[];
 };

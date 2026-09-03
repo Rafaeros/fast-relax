@@ -4,7 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import { Badge, Button, ButtonLink, Card, Icon, useToast } from "@/components/ui";
-import { formatSessionDate, formatTimeRange } from "@/features/collaborator-portal/lib/format";
+import { formatSessionDate, formatTimeRange, sessionEndInstant } from "@/features/collaborator-portal/lib/format";
 import {
   cancelSessionAction,
   finishSessionAction,
@@ -24,12 +24,6 @@ export type CurrentSessionCardProps = {
  * É o único lugar do app onde a sessão é acionada, então concentra as três
  * ações possíveis (iniciar, finalizar, cancelar) conforme o estado atual.
  */
-function getDurationSeconds(start: string, end: string) {
-  const [h1, m1] = start.split(":").map(Number);
-  const [h2, m2] = end.split(":").map(Number);
-  return (h2 * 60 + m2 - (h1 * 60 + m1)) * 60;
-}
-
 function formatCountdown(seconds: number) {
   const m = Math.floor(seconds / 60);
   const s = Math.floor(seconds % 60);
@@ -58,12 +52,13 @@ export function CurrentSessionCard({ session }: CurrentSessionCardProps) {
   useEffect(() => {
     if (session?.status !== "STARTED" || !session.startedAt || now === null || pending) return;
 
-    const startedAtMs = new Date(session.startedAt).getTime();
-    const elapsedSeconds = (now - startedAtMs) / 1000;
-    const durationSeconds = getDurationSeconds(session.startTime, session.endTime);
+    const endMs = sessionEndInstant(session.sessionDate, session.endTime).getTime();
 
-    // Finaliza automaticamente se o tempo já esgotou
-    if (elapsedSeconds >= durationSeconds) {
+    // Finaliza automaticamente no horário agendado de fim — não numa duração
+    // nominal contada da hora real de início. Quem começou atrasado (dentro
+    // da tolerância) faz uma sessão mais curta, mas termina junto com o
+    // horário previsto, preservando a folga de estabilização da próxima.
+    if (now >= endMs) {
       startTransition(async () => {
         const result = await finishSessionAction(session.id);
         if (result.ok) {
@@ -116,7 +111,7 @@ export function CurrentSessionCard({ session }: CurrentSessionCardProps) {
   if (started && session.startedAt && now !== null) {
     const startedAtMs = new Date(session.startedAt).getTime();
     const elapsedSeconds = (now - startedAtMs) / 1000;
-    const durationSeconds = getDurationSeconds(session.startTime, session.endTime);
+    const endMs = sessionEndInstant(session.sessionDate, session.endTime).getTime();
 
     if (elapsedSeconds < 5) {
       const remainingIntro = Math.ceil(5 - elapsedSeconds);
@@ -131,7 +126,7 @@ export function CurrentSessionCard({ session }: CurrentSessionCardProps) {
         </div>
       );
     } else {
-      const remainingSession = Math.max(0, Math.ceil(durationSeconds - elapsedSeconds));
+      const remainingSession = Math.max(0, Math.ceil((endMs - now) / 1000));
       timerDisplay = (
         <div className="mt-2 flex flex-col items-center justify-center rounded-control bg-surface-card py-4 text-center shadow-sm ring-1 ring-black/5">
           <span className="text-xs font-semibold uppercase tracking-wide text-ink-tertiary">

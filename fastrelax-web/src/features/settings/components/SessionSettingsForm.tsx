@@ -41,18 +41,18 @@ const FIELDS: {
     icon: "bell",
   },
   {
-    name: "earlyStartMinutes",
-    label: "Antecedência de início",
-    hint: "Quanto tempo antes do horário o colaborador já pode iniciar, se chegar adiantado.",
-    suffix: "min",
-    icon: "play",
-  },
-  {
     name: "maxAdvanceDays",
     label: "Antecedência máxima",
     hint: "Até quantos dias à frente é possível reservar.",
     suffix: "dias",
     icon: "calendar",
+  },
+  {
+    name: "stabilizationMinutes",
+    label: "Estabilização da cadeira",
+    hint: "Intervalo mínimo entre o fim de uma sessão e o início da próxima na mesma cadeira.",
+    suffix: "min",
+    icon: "chair",
   },
 ];
 

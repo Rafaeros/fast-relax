@@ -22,19 +22,19 @@ export function SessionSettingsSummary({ settings }: SessionSettingsSummaryProps
       icon: "bell",
     },
     {
-      value: `${settings.earlyStartMinutes} min`,
-      label: "Antecedência de início",
-      icon: "play",
-    },
-    {
       value: `${settings.maxAdvanceDays} ${settings.maxAdvanceDays === 1 ? "dia" : "dias"}`,
       label: "Antecedência máxima",
       icon: "calendar",
     },
+    {
+      value: `${settings.stabilizationMinutes} min`,
+      label: "Estabilização da cadeira",
+      icon: "chair",
+    },
   ];
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
       {cards.map((card) => (
         <Card key={card.label} padding="lg">
           <Stat value={card.value} label={card.label} icon={<Icon name={card.icon} />} />

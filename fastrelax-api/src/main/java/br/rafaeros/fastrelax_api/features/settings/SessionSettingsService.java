@@ -33,8 +33,8 @@ public class SessionSettingsService {
         CompanySessionSettings settings = getOrCreate();
         settings.setDefaultDurationMinutes(dto.defaultDurationMinutes());
         settings.setStartGraceMinutes(dto.startGraceMinutes());
-        settings.setEarlyStartMinutes(dto.earlyStartMinutes());
         settings.setMaxAdvanceDays(dto.maxAdvanceDays());
+        settings.setStabilizationMinutes(dto.stabilizationMinutes());
         return new SessionSettingsResponseDTO(settingsRepository.save(settings));
     }
 
@@ -50,16 +50,16 @@ public class SessionSettingsService {
         return getOrCreate().getStartGraceMinutes();
     }
 
-    /** Minutos de antecedência tolerados para iniciar antes do horário agendado. */
-    @Transactional
-    public int getEarlyStartMinutes() {
-        return getOrCreate().getEarlyStartMinutes();
-    }
-
     /** Teto de dias à frente para consultar horários e agendar. */
     @Transactional
     public int getMaxAdvanceDays() {
         return getOrCreate().getMaxAdvanceDays();
+    }
+
+    /** Minutos mínimos entre o fim de uma sessão e o início da próxima na mesma cadeira. */
+    @Transactional
+    public int getStabilizationMinutes() {
+        return getOrCreate().getStabilizationMinutes();
     }
 
     /**

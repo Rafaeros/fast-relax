@@ -65,6 +65,30 @@ public interface CollaboratorSessionRepository extends CompanyScopedRepository<C
             @Param("endTime") LocalTime endTime);
 
     /**
+     * Igual a {@link #countOverlapping}, mas por cadeira específica, não por
+     * capacidade agregada da empresa — é o que sustenta a folga de
+     * estabilização, que é uma propriedade da cadeira (relé + poltrona), não
+     * do total de cadeiras.
+     *
+     * @param excludeId id a ignorar ao reagendar; use um valor inexistente (-1) ao criar
+     */
+    @Query("""
+            SELECT COUNT(s) FROM CollaboratorSession s
+            WHERE s.chair.id = :chairId
+              AND s.sessionDate = :sessionDate
+              AND s.status IN :statuses
+              AND s.id <> :excludeId
+              AND s.startTime < :endTime
+              AND s.endTime > :startTime
+            """)
+    long countOverlappingChair(@Param("chairId") Long chairId,
+            @Param("sessionDate") LocalDate sessionDate,
+            @Param("statuses") List<SessionStatus> statuses,
+            @Param("excludeId") Long excludeId,
+            @Param("startTime") LocalTime startTime,
+            @Param("endTime") LocalTime endTime);
+
+    /**
      * Candidatas a expiração, de todas as empresas: sessões ainda ativas de hoje
      * ou de dias anteriores.
      */

@@ -12,15 +12,15 @@ export type SessionSettingsValidation =
 const LABELS: Record<SessionSettingsField, string> = {
   defaultDurationMinutes: "A duração",
   startGraceMinutes: "A tolerância",
-  earlyStartMinutes: "A antecedência de início",
   maxAdvanceDays: "A antecedência",
+  stabilizationMinutes: "A estabilização",
 };
 
 const UNITS: Record<SessionSettingsField, string> = {
   defaultDurationMinutes: "minutos",
   startGraceMinutes: "minutos",
-  earlyStartMinutes: "minutos",
   maxAdvanceDays: "dias",
+  stabilizationMinutes: "minutos",
 };
 
 /** Espelha as constraints de `UpdateSessionSettingsRequestDTO`. */

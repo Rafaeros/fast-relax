@@ -3,6 +3,16 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Alert, Card, Icon, Logo } from "@/components/ui";
 import { LoginBrandPanel } from "@/features/authentication/components/LoginBrandPanel";
+import {
+  LOGIN_CARD,
+  LOGIN_DESCRIPTION,
+  LOGIN_EYEBROW,
+  LOGIN_HEADING,
+  LOGIN_MAIN_SAFE_AREA,
+  LOGIN_SHELL,
+  LOGIN_STACK,
+  LOGIN_TITLE,
+} from "@/features/authentication/lib/login-layout";
 import { CollaboratorLoginForm } from "@/features/collaborator-portal/components/CollaboratorLoginForm";
 import { getCurrentCollaborator } from "@/features/collaborator-portal/services/portal.service";
 
@@ -33,7 +43,7 @@ export default async function CollaboratorLoginPage({
   return (
     // Duas colunas a partir de lg, igual ao login do painel: no celular sobra
     // só o formulário, que é como a maioria dos colaboradores entra.
-    <div className="grid min-h-dvh lg:h-dvh lg:grid-cols-2 lg:overflow-hidden">
+    <div className={LOGIN_SHELL}>
       <LoginBrandPanel
         eyebrow="Área do colaborador"
         title={
@@ -47,11 +57,12 @@ export default async function CollaboratorLoginPage({
         highlights={HIGHLIGHTS}
       />
 
-      <main
-        className="flex flex-col justify-center px-5 py-12 sm:px-10 lg:h-full lg:overflow-y-auto"
-        style={{ paddingTop: "calc(env(safe-area-inset-top) + 3rem)" }}
-      >
-        <div className="mx-auto flex w-full max-w-md flex-col gap-8">
+      {/*
+        A safe area do topo vive numa classe (e não em `style`), senão o inline
+        venceria o `lg:pt-*` da densidade de desktop por especificidade.
+      */}
+      <main className={LOGIN_MAIN_SAFE_AREA}>
+        <div className={LOGIN_STACK}>
           <div className="flex items-center justify-between">
             <Logo priority />
             <Link
@@ -63,10 +74,10 @@ export default async function CollaboratorLoginPage({
             </Link>
           </div>
 
-          <div className="flex flex-col gap-2">
-            <span className="eyebrow">Área do colaborador</span>
-            <h1 className="font-display text-3xl text-ink-primary">Bem-vindo</h1>
-            <p className="text-sm leading-relaxed text-ink-secondary">
+          <div className={LOGIN_HEADING}>
+            <span className={LOGIN_EYEBROW}>Área do colaborador</span>
+            <h1 className={LOGIN_TITLE}>Bem-vindo</h1>
+            <p className={LOGIN_DESCRIPTION}>
               Informe o identificador da empresa, seu CPF e sua senha para
               agendar e acompanhar suas sessões.
             </p>
@@ -78,7 +89,7 @@ export default async function CollaboratorLoginPage({
             </Alert>
           )}
 
-          <Card padding="lg">
+          <Card padding="lg" className={LOGIN_CARD}>
             <CollaboratorLoginForm />
           </Card>
 

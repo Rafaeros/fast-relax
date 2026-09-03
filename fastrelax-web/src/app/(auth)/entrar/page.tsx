@@ -4,6 +4,16 @@ import { redirect } from "next/navigation";
 import { Alert, Card, Icon, Logo } from "@/components/ui";
 import { LoginBrandPanel } from "@/features/authentication/components/LoginBrandPanel";
 import { LoginForm } from "@/features/authentication/components/LoginForm";
+import {
+  LOGIN_CARD,
+  LOGIN_DESCRIPTION,
+  LOGIN_EYEBROW,
+  LOGIN_HEADING,
+  LOGIN_MAIN,
+  LOGIN_SHELL,
+  LOGIN_STACK,
+  LOGIN_TITLE,
+} from "@/features/authentication/lib/login-layout";
 import { getCurrentUser } from "@/features/authentication/services/auth.service";
 
 export const metadata: Metadata = {
@@ -24,11 +34,11 @@ export default async function LoginPage({
   if (user) redirect("/painel");
 
   return (
-    <div className="grid min-h-dvh lg:h-dvh lg:grid-cols-2 lg:overflow-hidden">
+    <div className={LOGIN_SHELL}>
       <LoginBrandPanel />
 
-      <main className="flex flex-col justify-center px-5 py-12 sm:px-10 lg:h-full lg:overflow-y-auto">
-        <div className="mx-auto flex w-full max-w-md flex-col gap-8">
+      <main className={LOGIN_MAIN}>
+        <div className={LOGIN_STACK}>
           <div className="flex items-center justify-between">
             <Logo priority />
             <Link
@@ -40,10 +50,10 @@ export default async function LoginPage({
             </Link>
           </div>
 
-          <div className="flex flex-col gap-2">
-            <span className="eyebrow">Área do cliente</span>
-            <h1 className="font-display text-3xl text-ink-primary">Acesse seu painel</h1>
-            <p className="text-sm leading-relaxed text-ink-secondary">
+          <div className={LOGIN_HEADING}>
+            <span className={LOGIN_EYEBROW}>Área do cliente</span>
+            <h1 className={LOGIN_TITLE}>Acesse seu painel</h1>
+            <p className={LOGIN_DESCRIPTION}>
               Entre com as credenciais fornecidas pela sua empresa para gerenciar sessões,
               colaboradores e indicadores.
             </p>
@@ -55,7 +65,7 @@ export default async function LoginPage({
             </Alert>
           )}
 
-          <Card padding="lg">
+          <Card padding="lg" className={LOGIN_CARD}>
             <LoginForm />
           </Card>
 

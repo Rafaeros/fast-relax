@@ -160,8 +160,11 @@ export function BookingView({ collaboratorId, slots }: BookingViewProps) {
         )}
 
         <p className="text-xs text-ink-tertiary">
-          Cada massagem dura {slots.durationMinutes} minutos. Você pode ter uma sessão marcada por
-          vez.
+          Cada massagem dura {slots.durationMinutes} minutos, e a cadeira precisa de
+          {" "}
+          {slots.stabilizationMinutes} minuto{slots.stabilizationMinutes === 1 ? "" : "s"} para
+          estabilizar antes da próxima — por isso os horários pulam esse intervalo. Você pode ter
+          uma sessão marcada por vez.
         </p>
       </Card>
 

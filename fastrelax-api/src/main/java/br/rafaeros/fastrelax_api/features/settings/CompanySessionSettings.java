@@ -42,8 +42,8 @@ public class CompanySessionSettings implements CompanyOwned {
     /** Usados quando a empresa ainda não tem configuração gravada. */
     public static final int FALLBACK_DURATION_MINUTES = 5;
     public static final int FALLBACK_START_GRACE_MINUTES = 2;
-    public static final int FALLBACK_EARLY_START_MINUTES = 2;
     public static final int FALLBACK_MAX_ADVANCE_DAYS = 30;
+    public static final int FALLBACK_STABILIZATION_MINUTES = 1;
 
     @Id
     @Column(name = "company_id")
@@ -59,25 +59,34 @@ public class CompanySessionSettings implements CompanyOwned {
     private int defaultDurationMinutes = FALLBACK_DURATION_MINUTES;
 
     /**
-     * Minutos de tolerância para iniciar a sessão. Passou disso sem iniciar, ela
-     * vira EXPIRED e o horário volta a ficar disponível.
+     * Minutos de tolerância para iniciar a sessão <em>depois</em> do horário
+     * agendado. Passou disso sem iniciar, ela vira EXPIRED e o horário volta a
+     * ficar disponível.
+     *
+     * <p>
+     * Não existe simétrico para antes: adiantar o início ou encurtaria a
+     * massagem ou empurraria o desligamento para dentro da faixa reservada por
+     * outra pessoa na mesma cadeira.
      */
     @ColumnDefault("2")
     @Column(name = "start_grace_minutes", nullable = false)
     private int startGraceMinutes = FALLBACK_START_GRACE_MINUTES;
 
-    /**
-     * Minutos de antecedência tolerados para iniciar. Quem chega adiantado não
-     * fica esperando o relógio virar em frente à cadeira.
-     */
-    @ColumnDefault("2")
-    @Column(name = "early_start_minutes", nullable = false)
-    private int earlyStartMinutes = FALLBACK_EARLY_START_MINUTES;
-
     /** Quantos dias à frente o colaborador pode agendar, contando a partir de hoje. */
     @ColumnDefault("30")
     @Column(name = "max_advance_days", nullable = false)
     private int maxAdvanceDays = FALLBACK_MAX_ADVANCE_DAYS;
+
+    /**
+     * Minutos mínimos entre o fim de uma sessão e o início da próxima na mesma
+     * cadeira. O relé precisa desarmar e a poltrona estabilizar antes do
+     * próximo ciclo — sem essa folga, duas sessões "encaixadas" no papel (uma
+     * termina exatamente quando a outra começa) ligariam a cadeira de novo
+     * cedo demais.
+     */
+    @ColumnDefault("1")
+    @Column(name = "stabilization_minutes", nullable = false)
+    private int stabilizationMinutes = FALLBACK_STABILIZATION_MINUTES;
 
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)

@@ -40,6 +40,19 @@ public class CredentialService {
 
     private static final java.security.SecureRandom UNUSABLE_RANDOM = new java.security.SecureRandom();
 
+    /**
+     * Senha fixa de cadastro, a pedido do Rafael (2026-09-03) — substitui
+     * temporariamente {@link TemporaryPasswordGenerator#generate()} abaixo.
+     *
+     * <p>
+     * <b>Atenção:</b> ele já tinha recusado essa ideia antes, porque um valor
+     * fixo e conhecido é senha válida para qualquer cadastro ainda não
+     * acessado — {@code mustChangePassword} é a única barreira que sobra.
+     * Reverter para a geração aleatória (linha comentada abaixo) antes de
+     * qualquer ambiente com dado real.
+     */
+    private static final String DEFAULT_TEMPORARY_PASSWORD = "mudar@123";
+
     private final PasswordEncoder passwordEncoder;
     private final RefreshTokenService refreshTokenService;
     private final CredentialTokenService credentialTokenService;
@@ -85,7 +98,8 @@ public class CredentialService {
      *         cliente, já que o banco guarda apenas o hash
      */
     public String initializeWithTemporaryPassword(CredentialHolder holder) {
-        String temporary = TemporaryPasswordGenerator.generate();
+        // String temporary = TemporaryPasswordGenerator.generate();
+        String temporary = DEFAULT_TEMPORARY_PASSWORD;
         holder.setPasswordHash(passwordEncoder.encode(temporary));
         holder.setMustChangePassword(true);
         return temporary;

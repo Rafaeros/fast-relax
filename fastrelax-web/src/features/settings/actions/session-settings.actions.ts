@@ -24,8 +24,8 @@ export async function updateSessionSettingsAction(
   const validation = validateSessionSettingsInput({
     defaultDurationMinutes: String(formData.get("defaultDurationMinutes") ?? ""),
     startGraceMinutes: String(formData.get("startGraceMinutes") ?? ""),
-    earlyStartMinutes: String(formData.get("earlyStartMinutes") ?? ""),
     maxAdvanceDays: String(formData.get("maxAdvanceDays") ?? ""),
+    stabilizationMinutes: String(formData.get("stabilizationMinutes") ?? ""),
   });
 
   if (!validation.valid) {

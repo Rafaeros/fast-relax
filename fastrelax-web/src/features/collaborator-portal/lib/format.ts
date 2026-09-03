@@ -18,6 +18,19 @@ export function parseApiDate(value: string): Date {
   return new Date(year, month - 1, day);
 }
 
+/**
+ * Instante local do fim agendado de uma sessão, combinando `sessionDate` e
+ * `endTime`. É o alvo do cronômetro — não a hora de início real mais a
+ * duração nominal, que empurraria o fim para depois do horário previsto
+ * sempre que a sessão começasse atrasada (dentro da tolerância).
+ */
+export function sessionEndInstant(sessionDate: string, endTime: string): Date {
+  const date = parseApiDate(sessionDate);
+  const [hours, minutes] = endTime.split(":").map(Number);
+  date.setHours(hours, minutes, 0, 0);
+  return date;
+}
+
 /** `HH:mm:ss` para `HH:mm` — os segundos nunca interessam na tela. */
 export function formatTime(value: string): string {
   return value.slice(0, 5);

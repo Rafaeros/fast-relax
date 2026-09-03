@@ -4,13 +4,14 @@ import Link from "next/link";
 import { Alert, Button, Icon, Input } from "@/components/ui";
 import { PasswordField } from "@/features/authentication/components/PasswordField";
 import { useLoginForm } from "@/features/authentication/hooks/useLoginForm";
+import { LOGIN_FORM } from "@/features/authentication/lib/login-layout";
 
 export function LoginForm() {
   const { state, formAction, pending } = useLoginForm();
   const fieldErrors = state.fieldErrors ?? {};
 
   return (
-    <form action={formAction} className="flex flex-col gap-5" noValidate>
+    <form action={formAction} className={LOGIN_FORM} noValidate>
       {state.status === "error" && state.message && (
         <Alert tone="error">{state.message}</Alert>
       )}

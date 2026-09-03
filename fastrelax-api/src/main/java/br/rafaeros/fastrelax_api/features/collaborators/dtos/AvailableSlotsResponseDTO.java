@@ -15,6 +15,7 @@ public record AvailableSlotsResponseDTO(
     LocalDate from,
     LocalDate to,
     int durationMinutes,
+    int stabilizationMinutes,
     int maxAdvanceDays,
     List<AvailableDayDTO> days
 ) {}

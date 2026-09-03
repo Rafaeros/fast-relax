@@ -2,8 +2,8 @@
 export type SessionSettings = {
   defaultDurationMinutes: number;
   startGraceMinutes: number;
-  earlyStartMinutes: number;
   maxAdvanceDays: number;
+  stabilizationMinutes: number;
   updatedAt: string | null;
 };
 
@@ -11,8 +11,8 @@ export type SessionSettings = {
 export type UpdateSessionSettingsInput = {
   defaultDurationMinutes: number;
   startGraceMinutes: number;
-  earlyStartMinutes: number;
   maxAdvanceDays: number;
+  stabilizationMinutes: number;
 };
 
 export type SessionSettingsField = keyof UpdateSessionSettingsInput;
@@ -24,8 +24,8 @@ export type SessionSettingsField = keyof UpdateSessionSettingsInput;
 export const SETTINGS_LIMITS: Record<SessionSettingsField, { min: number; max: number }> = {
   defaultDurationMinutes: { min: 1, max: 120 },
   startGraceMinutes: { min: 0, max: 60 },
-  earlyStartMinutes: { min: 0, max: 60 },
   maxAdvanceDays: { min: 1, max: 365 },
+  stabilizationMinutes: { min: 0, max: 30 },
 };
 
 export type SessionSettingsFieldErrors = Partial<Record<SessionSettingsField, string>>;
@@ -45,8 +45,8 @@ export function fallbackSessionSettings(): SessionSettings {
   return {
     defaultDurationMinutes: 15,
     startGraceMinutes: 5,
-    earlyStartMinutes: 2,
     maxAdvanceDays: 7,
+    stabilizationMinutes: 1,
     updatedAt: null,
   };
 }

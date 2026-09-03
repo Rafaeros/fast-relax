@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useActionState } from "react";
 import { Alert, Button, Icon, Input, MaskedInput } from "@/components/ui";
+import { LOGIN_FORM } from "@/features/authentication/lib/login-layout";
 import { collaboratorLoginAction } from "@/features/collaborator-portal/actions/portal.actions";
 import { COLLABORATOR_LOGIN_INITIAL_STATE } from "@/features/collaborator-portal/types/portal.types";
 
@@ -27,7 +28,7 @@ export function CollaboratorLoginForm() {
   const generalError = state.status === "error" && state.message && !hasFieldError(fieldErrors);
 
   return (
-    <form action={formAction} className="flex flex-col gap-5" noValidate>
+    <form action={formAction} className={LOGIN_FORM} noValidate>
       {generalError && <Alert tone="error">{state.message}</Alert>}
 
       <Input

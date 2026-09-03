@@ -39,6 +39,11 @@ export function QuickCreateDepartmentButton({
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    // Este form nasce dentro do form de colaborador (o modal abre a partir de
+    // lá). Sem isto, o "submit" borbulha e também dispara o onSubmit do form
+    // de fora — que tenta cadastrar o colaborador junto, com os campos como
+    // estiverem naquele instante.
+    event.stopPropagation();
     setError(undefined);
 
     startTransition(async () => {
