@@ -41,6 +41,9 @@ export type { MaskedInputProps, MaskName } from "@/components/ui/MaskedInput";
 export { Field, Input, Textarea, Select } from "@/components/ui/Input";
 export type { InputProps, TextareaProps, SelectProps } from "@/components/ui/Input";
 
+export { PasswordInput } from "@/components/ui/PasswordInput";
+export type { PasswordInputProps } from "@/components/ui/PasswordInput";
+
 export { Alert } from "@/components/ui/Alert";
 export type { AlertProps, AlertTone } from "@/components/ui/Alert";
 

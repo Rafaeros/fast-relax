@@ -9,6 +9,8 @@ import br.rafaeros.fastrelax_api.core.tenancy.CompanyOwned;
 import br.rafaeros.fastrelax_api.features.companies.Company;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
@@ -44,6 +46,8 @@ public class CompanySessionSettings implements CompanyOwned {
     public static final int FALLBACK_START_GRACE_MINUTES = 2;
     public static final int FALLBACK_MAX_ADVANCE_DAYS = 30;
     public static final int FALLBACK_STABILIZATION_MINUTES = 1;
+    public static final int FALLBACK_QUOTA_LIMIT = 1;
+    public static final SessionQuotaPeriod FALLBACK_QUOTA_PERIOD = SessionQuotaPeriod.ACTIVE;
 
     @Id
     @Column(name = "company_id")
@@ -87,6 +91,30 @@ public class CompanySessionSettings implements CompanyOwned {
     @ColumnDefault("1")
     @Column(name = "stabilization_minutes", nullable = false)
     private int stabilizationMinutes = FALLBACK_STABILIZATION_MINUTES;
+
+    /**
+     * Quantas massagens um colaborador pode ter dentro do período da cota.
+     *
+     * <p>
+     * Vale por pessoa, não por empresa: o teto da empresa é o número de
+     * cadeiras, e disso cuida {@code requireSlotFree}.
+     */
+    @ColumnDefault("1")
+    @Column(name = "session_quota_limit", nullable = false)
+    private int sessionQuotaLimit = FALLBACK_QUOTA_LIMIT;
+
+    /**
+     * A janela em que {@link #sessionQuotaLimit} conta.
+     *
+     * <p>
+     * {@code ACTIVE} com limite 1 é a regra que o sistema tinha fixa em índice —
+     * uma massagem marcada por vez — e continua sendo o padrão de quem não
+     * configura nada.
+     */
+    @ColumnDefault("'ACTIVE'")
+    @Enumerated(EnumType.STRING)
+    @Column(name = "session_quota_period", nullable = false, length = 10)
+    private SessionQuotaPeriod sessionQuotaPeriod = FALLBACK_QUOTA_PERIOD;
 
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)

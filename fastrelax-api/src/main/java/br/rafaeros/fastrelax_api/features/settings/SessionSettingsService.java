@@ -35,6 +35,8 @@ public class SessionSettingsService {
         settings.setStartGraceMinutes(dto.startGraceMinutes());
         settings.setMaxAdvanceDays(dto.maxAdvanceDays());
         settings.setStabilizationMinutes(dto.stabilizationMinutes());
+        settings.setSessionQuotaLimit(dto.sessionQuotaLimit());
+        settings.setSessionQuotaPeriod(dto.sessionQuotaPeriod());
         return new SessionSettingsResponseDTO(settingsRepository.save(settings));
     }
 
@@ -60,6 +62,18 @@ public class SessionSettingsService {
     @Transactional
     public int getStabilizationMinutes() {
         return getOrCreate().getStabilizationMinutes();
+    }
+
+    /** Quantas massagens um colaborador pode ter dentro do período da cota. */
+    @Transactional
+    public int getSessionQuotaLimit() {
+        return getOrCreate().getSessionQuotaLimit();
+    }
+
+    /** A janela em que a cota é contada. */
+    @Transactional
+    public SessionQuotaPeriod getSessionQuotaPeriod() {
+        return getOrCreate().getSessionQuotaPeriod();
     }
 
     /**

@@ -27,6 +27,7 @@ import br.rafaeros.fastrelax_api.features.collaborators.dtos.CollaboratorSession
 import br.rafaeros.fastrelax_api.features.collaborators.dtos.CollaboratorSessionFilterDTO;
 import br.rafaeros.fastrelax_api.features.collaborators.dtos.CollaboratorSessionResponseDTO;
 import br.rafaeros.fastrelax_api.features.collaborators.dtos.SessionSlotDTO;
+import br.rafaeros.fastrelax_api.features.settings.SessionQuotaPeriod;
 import br.rafaeros.fastrelax_api.features.settings.SessionSettingsService;
 import lombok.RequiredArgsConstructor;
 
@@ -35,6 +36,14 @@ import lombok.RequiredArgsConstructor;
 public class CollaboratorSessionService {
 
     private static final List<SessionStatus> ACTIVE_STATUSES = List.of(SessionStatus.SCHEDULED, SessionStatus.STARTED);
+
+    /**
+     * O que consome cota numa janela de calendário: o que está marcado, o que
+     * está rodando e o que já aconteceu. Cancelada e expirada ficam de fora — a
+     * primeira devolveu o horário, a segunda já custou a massagem do dia.
+     */
+    private static final List<SessionStatus> QUOTA_STATUSES = List.of(SessionStatus.SCHEDULED, SessionStatus.STARTED,
+            SessionStatus.DONE);
 
     private static final java.time.format.DateTimeFormatter DATE_FORMAT = java.time.format.DateTimeFormatter
             .ofPattern("dd/MM/yyyy");
@@ -91,7 +100,7 @@ public class CollaboratorSessionService {
         sessionExpirationService.expireAbandonedSessions();
 
         Long collaboratorId = resolveCollaboratorId(null);
-        return sessionRepository.findByCollaboratorIdAndStatusIn(collaboratorId, ACTIVE_STATUSES)
+        return findCurrentActive(collaboratorId)
                 .map(session -> new CollaboratorSessionResponseDTO(session));
     }
 
@@ -260,7 +269,7 @@ public class CollaboratorSessionService {
         LocalTime endTime = resolveEndTime(dto.startTime());
         validateWindow(dto.sessionDate(), dto.startTime(), endTime);
         validateWithinAllowedWindow(dto.collaboratorId(), dto.sessionDate(), dto.startTime(), endTime);
-        requireNoActiveSession(dto.collaboratorId());
+        requireWithinQuota(dto.collaboratorId(), dto.sessionDate(), null);
         requireSlotFree(dto.sessionDate(), dto.startTime(), endTime, null);
         requireChairStabilized(dto.chairId(), dto.sessionDate(), dto.startTime(), endTime, null);
 
@@ -296,6 +305,9 @@ public class CollaboratorSessionService {
         LocalTime endTime = resolveEndTime(dto.startTime());
         validateWindow(dto.sessionDate(), dto.startTime(), endTime);
         validateWithinAllowedWindow(session.getCollaborator().getId(), dto.sessionDate(), dto.startTime(), endTime);
+        // A própria sessão sai da contagem: reagendar não pode esbarrar na cota
+        // que ela mesma ocupa. Mudar de semana, porém, é entrar na cota da nova.
+        requireWithinQuota(session.getCollaborator().getId(), dto.sessionDate(), session.getId());
         requireSlotFree(dto.sessionDate(), dto.startTime(), endTime, session.getId());
         requireChairStabilized(session.getChair().getId(), dto.sessionDate(), dto.startTime(), endTime,
                 session.getId());
@@ -358,9 +370,8 @@ public class CollaboratorSessionService {
      *
      * <p>
      * O app não precisa guardar id nem perguntar antes qual sessão é a de agora:
-     * o índice único {@code uq_collaborator_active_session} garante no máximo uma
-     * ativa por colaborador, então "a sessão dele" é sempre inequívoca. A janela
-     * de início continua sendo validada — o que muda é só quem descobre o id.
+     * {@link #findCurrentActive(Long)} resolve isso. A janela de início continua
+     * sendo validada — o que muda é só quem descobre o id.
      *
      * <p>
      * Chamar de novo com a sessão já em andamento devolve a mesma sessão em vez
@@ -373,8 +384,7 @@ public class CollaboratorSessionService {
         sessionExpirationService.expireAbandonedSessions();
 
         Long collaboratorId = requireLoggedCollaboratorId();
-        CollaboratorSession session = sessionRepository
-                .findByCollaboratorIdAndStatusIn(collaboratorId, ACTIVE_STATUSES)
+        CollaboratorSession session = findCurrentActive(collaboratorId)
                 .orElseThrow(() -> new BusinessException(
                         "Você não tem sessão agendada. Agende um horário para iniciar."));
 
@@ -537,17 +547,88 @@ public class CollaboratorSessionService {
         return padded.isBefore(time) ? LocalTime.MAX : padded;
     }
 
-    private void requireNoActiveSession(Long collaboratorId) {
-        sessionRepository.findByCollaboratorIdAndStatusIn(collaboratorId, ACTIVE_STATUSES)
-                .ifPresent(active -> {
-                    // Label e data em pt-BR: a mensagem é exibida direto ao
-                    // colaborador, e o nome do enum não diz nada para ele.
-                    throw new BusinessException("Você já tem uma massagem "
-                            + active.getStatus().getLabel().toLowerCase() + " em "
-                            + active.getSessionDate().format(DATE_FORMAT) + " às "
-                            + active.getStartTime().format(TIME_FORMAT)
-                            + ". Cancele antes de marcar outra.");
-                });
+    /**
+     * A cota de massagens do colaborador, do jeito que a empresa contratou.
+     *
+     * <p>
+     * Era "uma sessão ativa por pessoa", fixo em índice. Virou limite mais
+     * período: {@code ACTIVE} conta o que está marcado agora — a regra antiga,
+     * quando o limite é 1 —, e {@code DAY}/{@code WEEK}/{@code MONTH} contam pela
+     * data da sessão, para "uma por semana" significar uma na semana da massagem
+     * e não uma a cada sete dias corridos desde a última.
+     *
+     * <p>
+     * Cancelada e expirada não ocupam cota. A primeira porque devolver o horário
+     * e continuar consumindo o limite seria punição sem regra; a segunda porque
+     * quem não compareceu já perdeu a massagem daquele dia — tirar também a
+     * próxima é decisão de RH, não de sistema.
+     *
+     * @param excludeId sessão a ignorar ao reagendar; {@code null} ao criar
+     */
+    private void requireWithinQuota(Long collaboratorId, LocalDate sessionDate, Long excludeId) {
+        int limit = sessionSettingsService.getSessionQuotaLimit();
+        SessionQuotaPeriod period = sessionSettingsService.getSessionQuotaPeriod();
+        long exclude = excludeId != null ? excludeId : -1L;
+
+        if (!period.isWindowed()) {
+            long active = sessionRepository.countActiveForQuota(collaboratorId, ACTIVE_STATUSES, exclude);
+            if (active >= limit) {
+                throw new BusinessException(activeQuotaMessage(collaboratorId, limit, exclude));
+            }
+            return;
+        }
+
+        LocalDate from = period.startOf(sessionDate);
+        LocalDate to = period.endOf(sessionDate);
+        long used = sessionRepository.countInPeriodForQuota(collaboratorId, QUOTA_STATUSES, exclude, from, to);
+
+        if (used >= limit) {
+            throw new BusinessException("Você já atingiu o limite de " + limit + " "
+                    + (limit == 1 ? "massagem" : "massagens") + " " + period.getLabel()
+                    + " (de " + from.format(DATE_FORMAT) + " a " + to.format(DATE_FORMAT)
+                    + "). Escolha uma data fora desse período.");
+        }
+    }
+
+    /**
+     * Mensagem da cota {@code ACTIVE}: quando o limite é 1, diz qual massagem
+     * está ocupando a vaga — é a informação que resolve o problema de quem
+     * esqueceu que já tinha marcado. Acima disso a lista deixaria de caber numa
+     * frase, e o número basta.
+     */
+    private String activeQuotaMessage(Long collaboratorId, int limit, long excludeId) {
+        if (limit > 1) {
+            return "Você já tem " + limit + " massagens marcadas, o máximo permitido ao mesmo tempo. "
+                    + "Cancele uma delas para marcar outra.";
+        }
+
+        return findCurrentActive(collaboratorId)
+                .filter(active -> !active.getId().equals(excludeId))
+                // Label e data em pt-BR: a mensagem é exibida direto ao
+                // colaborador, e o nome do enum não diz nada para ele.
+                .map(active -> "Você já tem uma massagem " + active.getStatus().getLabel().toLowerCase()
+                        + " em " + active.getSessionDate().format(DATE_FORMAT) + " às "
+                        + active.getStartTime().format(TIME_FORMAT) + ". Cancele antes de marcar outra.")
+                .orElse("Você já tem uma massagem marcada. Cancele antes de marcar outra.");
+    }
+
+    /**
+     * A massagem "de agora" do colaborador: a que está em andamento ou, se não
+     * houver nenhuma rodando, a próxima marcada.
+     *
+     * <p>
+     * Com cota maior que uma, "a sessão dele" deixou de ser única. A em andamento
+     * ganha de qualquer marcada — é a que está com a cadeira ligada — e entre as
+     * marcadas vale a mais próxima, que é a que o app precisa mostrar e iniciar.
+     */
+    private Optional<CollaboratorSession> findCurrentActive(Long collaboratorId) {
+        List<CollaboratorSession> active = sessionRepository
+                .findByCollaboratorIdAndStatusInOrderBySessionDateAscStartTimeAsc(collaboratorId, ACTIVE_STATUSES);
+
+        return active.stream()
+                .filter(session -> session.getStatus() == SessionStatus.STARTED)
+                .findFirst()
+                .or(() -> active.stream().findFirst());
     }
 
     /**

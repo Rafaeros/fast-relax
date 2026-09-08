@@ -13,7 +13,7 @@ const ROUTE = "/painel/configuracao-sessao";
 /**
  * Salva as configurações de sessão da empresa em curso.
  *
- * O `PUT` substitui os três valores de uma vez — é assim que o endpoint
+ * O `PUT` substitui a configuração inteira de uma vez — é assim que o endpoint
  * funciona, então o formulário sempre envia o conjunto completo, mesmo quando
  * só um campo mudou.
  */
@@ -26,6 +26,8 @@ export async function updateSessionSettingsAction(
     startGraceMinutes: String(formData.get("startGraceMinutes") ?? ""),
     maxAdvanceDays: String(formData.get("maxAdvanceDays") ?? ""),
     stabilizationMinutes: String(formData.get("stabilizationMinutes") ?? ""),
+    sessionQuotaLimit: String(formData.get("sessionQuotaLimit") ?? ""),
+    sessionQuotaPeriod: String(formData.get("sessionQuotaPeriod") ?? ""),
   });
 
   if (!validation.valid) {

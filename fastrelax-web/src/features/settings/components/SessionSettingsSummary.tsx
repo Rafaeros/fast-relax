@@ -2,7 +2,10 @@
 
 import { Card, Icon, Stat } from "@/components/ui";
 import type { IconName } from "@/components/ui";
-import type { SessionSettings } from "@/features/settings/types/session-settings.types";
+import {
+  QUOTA_PERIOD_LABELS,
+  type SessionSettings,
+} from "@/features/settings/types/session-settings.types";
 
 export type SessionSettingsSummaryProps = {
   settings: SessionSettings;
@@ -30,6 +33,13 @@ export function SessionSettingsSummary({ settings }: SessionSettingsSummaryProps
       value: `${settings.stabilizationMinutes} min`,
       label: "Estabilização da cadeira",
       icon: "chair",
+    },
+    {
+      // O número em destaque e o período no rótulo: "2" sozinho não diz nada,
+      // e a frase inteira no valor quebraria o cartão em três linhas.
+      value: String(settings.sessionQuotaLimit),
+      label: `Massagens ${QUOTA_PERIOD_LABELS[settings.sessionQuotaPeriod]}`,
+      icon: "heart",
     },
   ];
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { Alert, Button, Icon, Input } from "@/components/ui";
+import { Alert, Button, Icon, PasswordInput } from "@/components/ui";
 import {
   PASSWORD_INITIAL_STATE,
   type PasswordFormState,
@@ -41,9 +41,8 @@ export function PasswordSetupForm({ mode, action }: PasswordSetupFormProps) {
       )}
 
       {!firstAccess && (
-        <Input
+        <PasswordInput
           name="currentPassword"
-          type="password"
           label="Senha atual"
           autoComplete="current-password"
           disabled={pending}
@@ -52,9 +51,8 @@ export function PasswordSetupForm({ mode, action }: PasswordSetupFormProps) {
         />
       )}
 
-      <Input
+      <PasswordInput
         name="newPassword"
-        type="password"
         label="Nova senha"
         autoComplete="new-password"
         autoFocus={firstAccess}
@@ -64,9 +62,8 @@ export function PasswordSetupForm({ mode, action }: PasswordSetupFormProps) {
         leadingIcon={<Icon name="key" />}
       />
 
-      <Input
+      <PasswordInput
         name="confirmNewPassword"
-        type="password"
         label="Confirme a nova senha"
         autoComplete="new-password"
         disabled={pending}

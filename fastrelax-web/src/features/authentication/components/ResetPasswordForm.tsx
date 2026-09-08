@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { Alert, Button, Icon, Input } from "@/components/ui";
+import { Alert, Button, Icon, PasswordInput } from "@/components/ui";
 import { resetPasswordAction } from "@/features/authentication/actions/recovery.actions";
 import {
   PASSWORD_INITIAL_STATE,
@@ -39,9 +39,8 @@ export function ResetPasswordForm({ token, target }: ResetPasswordFormProps) {
       {/* Decide para qual login voltar no fim — painel ou app do colaborador. */}
       <input type="hidden" name="audience" value={target.audience} />
 
-      <Input
+      <PasswordInput
         name="newPassword"
-        type="password"
         label={invite ? "Sua senha" : "Nova senha"}
         autoComplete="new-password"
         autoFocus
@@ -51,9 +50,8 @@ export function ResetPasswordForm({ token, target }: ResetPasswordFormProps) {
         leadingIcon={<Icon name="key" />}
       />
 
-      <Input
+      <PasswordInput
         name="confirmNewPassword"
-        type="password"
         label="Confirme a senha"
         autoComplete="new-password"
         disabled={pending}

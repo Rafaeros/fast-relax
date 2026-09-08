@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Alert, Button, Icon, Input } from "@/components/ui";
-import { PasswordField } from "@/features/authentication/components/PasswordField";
+import { Alert, Button, Icon, Input, PasswordInput } from "@/components/ui";
 import { useLoginForm } from "@/features/authentication/hooks/useLoginForm";
 import { LOGIN_FORM } from "@/features/authentication/lib/login-layout";
 
@@ -36,11 +35,12 @@ export function LoginForm() {
         leadingIcon={<Icon name="mail" />}
       />
 
-      <PasswordField
+      <PasswordInput
         name="password"
         label="Senha"
         placeholder="Sua senha"
         autoComplete="current-password"
+        leadingIcon={<Icon name="lock" />}
         // Foco vai para cá quando o erro foi de credencial: é onde a correção
         // acontece, e o e-mail já está preenchido.
         autoFocus={state.status === "error" && Boolean(state.email)}

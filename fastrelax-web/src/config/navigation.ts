@@ -130,6 +130,14 @@ export const PANEL_NAV: PanelNavItem[] = [
     icon: "calendar",
   },
   {
+    section: "Operação",
+    label: "Avaliações",
+    description: "Notas e comentários que os colaboradores deram às massagens.",
+    href: "/painel/avaliacoes" as Route,
+    roles: COMPANY_ROLES,
+    icon: "heart",
+  },
+  {
     section: "Acessos",
     label: "Usuários",
     description: "Contas com acesso ao painel.",

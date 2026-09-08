@@ -23,8 +23,59 @@ public interface CollaboratorSessionRepository extends CompanyScopedRepository<C
 
     List<CollaboratorSession> findByCollaboratorId(Long collaboratorId);
 
-    /** Espelha o índice parcial {@code uq_collaborator_active_session}. */
-    Optional<CollaboratorSession> findByCollaboratorIdAndStatusIn(Long collaboratorId, List<SessionStatus> statuses);
+    /**
+     * Massagens marcadas ou em andamento do colaborador, da mais próxima para a
+     * mais distante.
+     *
+     * <p>
+     * Devolvia uma {@code Optional}, porque o índice parcial
+     * {@code uq_collaborator_active_session} garantia no máximo uma. Com a cota
+     * por empresa esse teto passou a ser configurável, e a consulta que
+     * assumisse unicidade estouraria
+     * {@code IncorrectResultSizeDataAccessException} no primeiro cliente que
+     * contratasse duas.
+     */
+    List<CollaboratorSession> findByCollaboratorIdAndStatusInOrderBySessionDateAscStartTimeAsc(Long collaboratorId,
+            List<SessionStatus> statuses);
+
+    /**
+     * Quantas massagens do colaborador ocupam a cota agora — as marcadas e a que
+     * estiver em andamento.
+     *
+     * @param excludeId id a ignorar ao reagendar; use um valor inexistente (-1) ao criar
+     */
+    @Query("""
+            SELECT COUNT(s) FROM CollaboratorSession s
+            WHERE s.collaborator.id = :collaboratorId
+              AND s.status IN :statuses
+              AND s.id <> :excludeId
+            """)
+    long countActiveForQuota(@Param("collaboratorId") Long collaboratorId,
+            @Param("statuses") List<SessionStatus> statuses,
+            @Param("excludeId") Long excludeId);
+
+    /**
+     * Quantas massagens do colaborador caem dentro da janela da cota.
+     *
+     * <p>
+     * Conta pela data da sessão, não pela data em que foi marcada: o acordo é
+     * "uma massagem por semana", e quem marca na sexta para a semana seguinte não
+     * gastou a desta.
+     *
+     * @param excludeId id a ignorar ao reagendar; use um valor inexistente (-1) ao criar
+     */
+    @Query("""
+            SELECT COUNT(s) FROM CollaboratorSession s
+            WHERE s.collaborator.id = :collaboratorId
+              AND s.status IN :statuses
+              AND s.id <> :excludeId
+              AND s.sessionDate BETWEEN :from AND :to
+            """)
+    long countInPeriodForQuota(@Param("collaboratorId") Long collaboratorId,
+            @Param("statuses") List<SessionStatus> statuses,
+            @Param("excludeId") Long excludeId,
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to);
 
     /** Base das agregações do painel. */
     List<CollaboratorSession> findByCompanyIdAndSessionDateBetween(Long companyId, LocalDate from, LocalDate to);

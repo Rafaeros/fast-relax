@@ -42,7 +42,8 @@ public class TokenService {
     @Value("${api.security.token.secret:my-secret-key}")
     private String secret;
 
-    @Value("${api.security.token.expiration-hours:2}")
+    /** Uma semana. O padrão acompanha o {@code application.properties}. */
+    @Value("${api.security.token.expiration-hours:168}")
     private long accessTokenHours;
 
     /** O subject do usuário do painel é o e-mail, que é único no sistema inteiro. */

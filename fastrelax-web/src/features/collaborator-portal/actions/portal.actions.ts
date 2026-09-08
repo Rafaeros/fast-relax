@@ -59,8 +59,10 @@ export async function collaboratorLoginAction(
 
   if (!result.ok) {
     // A API responde a mesma mensagem para empresa inexistente, CPF que não
-    // está lá, senha errada e acesso desativado — de propósito, para não deixar
-    // mapear quem é cliente. Por isso o erro é geral, e não de um campo só.
+    // está lá e senha errada — de propósito, para não deixar mapear quem é
+    // cliente. Cadastro ou empresa desativados vêm com o motivo, porque só
+    // aparecem depois da senha conferida. Nos dois casos o erro é geral: nenhum
+    // deles é de um campo só.
     return { status: "error", message: result.message, ...typed };
   }
 

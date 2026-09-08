@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useActionState } from "react";
-import { Alert, Button, Icon, Input, MaskedInput } from "@/components/ui";
+import { Alert, Button, Icon, Input, MaskedInput, PasswordInput } from "@/components/ui";
 import { LOGIN_FORM } from "@/features/authentication/lib/login-layout";
 import { collaboratorLoginAction } from "@/features/collaborator-portal/actions/portal.actions";
 import { COLLABORATOR_LOGIN_INITIAL_STATE } from "@/features/collaborator-portal/types/portal.types";
@@ -23,8 +23,10 @@ export function CollaboratorLoginForm() {
   );
 
   const fieldErrors = state.fieldErrors ?? {};
-  // A recusa de credencial vem sem campo marcado — a API responde a mesma
-  // mensagem para empresa, CPF e senha, para não deixar descobrir qual errou.
+  // A recusa vem sem campo marcado: para credencial inválida a API responde a
+  // mesma mensagem para empresa, CPF e senha, para não deixar descobrir qual
+  // errou; para acesso ou empresa desativados ela explica o motivo, e nenhum
+  // dos dois pertence a um campo do formulário.
   const generalError = state.status === "error" && state.message && !hasFieldError(fieldErrors);
 
   return (
@@ -62,9 +64,8 @@ export function CollaboratorLoginForm() {
         leadingIcon={<Icon name="users" />}
       />
 
-      <Input
+      <PasswordInput
         name="password"
-        type="password"
         label="Senha"
         placeholder="Sua senha"
         autoComplete="current-password"

@@ -1,5 +1,6 @@
 package br.rafaeros.fastrelax_api.features.settings.dtos;
 
+import br.rafaeros.fastrelax_api.features.settings.SessionQuotaPeriod;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
@@ -28,5 +29,18 @@ public record UpdateSessionSettingsRequestDTO(
     @NotNull(message = "A estabilização é obrigatória")
     @Min(value = 0, message = "A estabilização deve ser de no mínimo 0 minutos")
     @Max(value = 30, message = "A estabilização deve ser de no máximo 30 minutos")
-    Integer stabilizationMinutes
+    Integer stabilizationMinutes,
+
+    /** Quantas massagens cada colaborador pode ter dentro do período da cota. */
+    @NotNull(message = "O limite de massagens é obrigatório")
+    @Min(value = 1, message = "O limite deve ser de no mínimo 1 massagem")
+    @Max(value = 20, message = "O limite deve ser de no máximo 20 massagens")
+    Integer sessionQuotaLimit,
+
+    /**
+     * Janela em que o limite conta. {@code ACTIVE} não olha calendário: são as
+     * massagens marcadas ou em andamento ao mesmo tempo.
+     */
+    @NotNull(message = "O período da cota é obrigatório")
+    SessionQuotaPeriod sessionQuotaPeriod
 ) {}

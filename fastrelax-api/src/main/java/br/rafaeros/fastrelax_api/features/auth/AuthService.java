@@ -26,14 +26,27 @@ import lombok.RequiredArgsConstructor;
 public class AuthService {
 
     /**
-     * Uma resposta só para toda recusa do login do colaborador.
+     * Uma resposta só para toda recusa <em>de credencial</em> do colaborador.
      *
      * <p>
-     * Empresa inexistente, CPF que não está lá, senha errada e cadastro
-     * desativado dizem exatamente a mesma coisa. Diferenciá-los seria entregar,
-     * de graça, quem é cliente da Physical e quem trabalha em cada cliente.
+     * Empresa inexistente, CPF que não está lá e senha errada dizem exatamente a
+     * mesma coisa. Diferenciá-los seria entregar, de graça, quem é cliente da
+     * Physical e quem trabalha em cada cliente.
      */
     private static final String INVALID_CREDENTIALS = "Empresa, CPF ou senha inválidos";
+
+    /**
+     * Recusas que só aparecem <b>depois</b> da senha conferida.
+     *
+     * <p>
+     * Aqui a mensagem pode ser específica sem virar oráculo: quem chegou até este
+     * ponto provou a senha, então já sabia que a conta existe. O que estas duas
+     * frases acrescentam é o que a genérica escondia — não adianta tentar de novo,
+     * nem trocar a senha; o caminho é falar com o RH.
+     */
+    private static final String COLLABORATOR_DISABLED = "Seu acesso está desativado. Fale com o RH da sua empresa para reativá-lo.";
+
+    private static final String COMPANY_DISABLED = "O acesso da sua empresa está suspenso. Fale com o RH da sua empresa.";
 
     private final AuthenticationManager authenticationManager;
     private final TokenService tokenService;
@@ -81,9 +94,13 @@ public class AuthService {
                     return new BusinessException(INVALID_CREDENTIALS);
                 });
 
-        if (!credentialService.matches(collaborator, data.password()) || !collaborator.isEnabled()) {
+        if (!credentialService.matches(collaborator, data.password())) {
             throw new BusinessException(INVALID_CREDENTIALS);
         }
+
+        // Só depois da senha conferida: a ordem é o que separa "avisar quem tem
+        // direito de saber" de "responder a quem está adivinhando CPF".
+        requireActiveAccess(collaborator);
 
         loginRateLimiter.reset(clientKey);
         Company company = collaborator.getCompany();
@@ -99,9 +116,35 @@ public class AuthService {
     }
 
     /**
+     * Por que o acesso foi recusado a quem já provou a senha.
+     *
+     * <p>
+     * A empresa vem primeiro porque é a causa mais abrangente: com o contrato
+     * suspenso, todo mundo daquele cliente esbarra aqui, e dizer "seu cadastro
+     * está desativado" mandaria cada pessoa pedir ao RH uma reativação
+     * individual que não resolveria nada.
+     */
+    private void requireActiveAccess(Collaborator collaborator) {
+        Company company = collaborator.getCompany();
+        if (company == null || !company.isEnabled()) {
+            throw new BusinessException(COMPANY_DISABLED);
+        }
+
+        if (!collaborator.isEnabled()) {
+            throw new BusinessException(COLLABORATOR_DISABLED);
+        }
+    }
+
+    /**
      * Slug fora do formato e CPF malformado morrem aqui em silêncio, como um
      * cadastro que não existe. Deixá-los estourar produziria uma mensagem
      * diferente da de senha errada, e portanto um oráculo.
+     *
+     * <p>
+     * A empresa desativada <em>não</em> é filtrada: descartá-la aqui devolveria a
+     * mensagem genérica de credencial inválida e deixaria o colaborador tentando
+     * a senha de novo, sem saber que o problema não é dele. Quem decide é
+     * {@link #requireActiveAccess(Collaborator)}, depois da senha.
      */
     private Optional<Collaborator> findCandidate(CollaboratorLoginRequestDTO data) {
         String slug = SlugUtils.sanitize(data.companySlug());
@@ -114,7 +157,6 @@ public class AuthService {
         }
 
         return companyRepository.findBySlug(slug)
-                .filter(Company::isEnabled)
                 .flatMap(company -> collaboratorRepository
                         .findByCompanyIdAndCpfHash(company.getId(), cryptoService.blindIndex(cpf)));
     }
@@ -140,9 +182,12 @@ public class AuthService {
         // Revalida o estado atual: quem foi desativado — ou cuja empresa foi
         // suspensa — depois do login não renova.
         Collaborator collaborator = collaboratorRepository.findById(consumed.getSubjectId())
-                .filter(candidate -> candidate.isEnabled())
-                .orElseThrow(() -> new BusinessException(
-                        "Seu acesso está desativado. Entre em contato com o RH."));
+                .orElseThrow(() -> new BusinessException(COLLABORATOR_DISABLED));
+
+        // Mesma distinção do login: quem apresenta um refresh token válido já
+        // provou quem é, e merece saber se o que caiu foi o acesso dele ou o da
+        // empresa inteira.
+        requireActiveAccess(collaborator);
         return new LoginResponseDTO(
                 tokenService.generateToken(collaborator),
                 refreshTokenService.issue(RefreshToken.SubjectType.COLLABORATOR, collaborator.getId()),

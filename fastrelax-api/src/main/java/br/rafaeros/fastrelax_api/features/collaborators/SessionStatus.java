@@ -13,9 +13,9 @@ package br.rafaeros.fastrelax_api.features.collaborators;
  *     └──(não iniciou até a tolerância)──▶ EXPIRED
  * </pre>
  *
- * {@link #SCHEDULED} and {@link #STARTED} are the "active" states covered by
- * the partial unique index {@code uq_collaborator_active_session}, which allows
- * only one of them per collaborator at a time.
+ * {@link #SCHEDULED} and {@link #STARTED} are the "active" states: they are the
+ * ones that occupy the collaborator's quota, whose limit and period each company
+ * configures in {@code company_session_settings}.
  *
  * <p>
  * {@link #EXPIRED} significa uma coisa só: não compareceu. Sessão iniciada que

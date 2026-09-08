@@ -8,6 +8,8 @@ import {
   listMySessions,
 } from "@/features/collaborator-portal/services/portal.service";
 import type { CollaboratorSession } from "@/features/collaborator-portal/types/portal.types";
+import { PendingEvaluationPrompt } from "@/features/evaluations/components/PendingEvaluationPrompt";
+import { getPendingEvaluation } from "@/features/evaluations/services/evaluation.service";
 
 export const metadata: Metadata = {
   title: "Início — physical",
@@ -29,9 +31,10 @@ function summarize(sessions: CollaboratorSession[]) {
 }
 
 export default async function CollaboratorHomePage() {
-  const [currentResult, historyResult] = await Promise.all([
+  const [currentResult, historyResult, pendingResult] = await Promise.all([
     getMyCurrentSession(),
     listMySessions({ size: 100 }),
+    getPendingEvaluation(),
   ]);
 
   const sessions = historyResult.ok ? historyResult.data.content : [];
@@ -61,6 +64,10 @@ export default async function CollaboratorHomePage() {
       <MonthlyUsageChart sessions={sessions} />
 
       <SessionHistoryList sessions={sessions} limit={5} />
+
+      {/* A massagem terminou e ainda não recebeu nota: o modal abre sobre a
+          home, que é onde a pessoa cai depois de finalizar a sessão. */}
+      <PendingEvaluationPrompt session={pendingResult.ok ? pendingResult.data : null} />
     </div>
   );
 }

@@ -1,7 +1,10 @@
 import {
+  SESSION_QUOTA_PERIODS,
   SETTINGS_LIMITS,
+  type SessionQuotaPeriod,
   type SessionSettingsField,
   type SessionSettingsFieldErrors,
+  type SessionSettingsNumericField,
   type UpdateSessionSettingsInput,
 } from "@/features/settings/types/session-settings.types";
 
@@ -9,26 +12,30 @@ export type SessionSettingsValidation =
   | { valid: true; data: UpdateSessionSettingsInput }
   | { valid: false; fieldErrors: SessionSettingsFieldErrors };
 
-const LABELS: Record<SessionSettingsField, string> = {
+const LABELS: Record<SessionSettingsNumericField, string> = {
   defaultDurationMinutes: "A duração",
   startGraceMinutes: "A tolerância",
   maxAdvanceDays: "A antecedência",
   stabilizationMinutes: "A estabilização",
+  sessionQuotaLimit: "O limite",
 };
 
-const UNITS: Record<SessionSettingsField, string> = {
+const UNITS: Record<SessionSettingsNumericField, string> = {
   defaultDurationMinutes: "minutos",
   startGraceMinutes: "minutos",
   maxAdvanceDays: "dias",
   stabilizationMinutes: "minutos",
+  sessionQuotaLimit: "massagens",
 };
 
 /** Espelha as constraints de `UpdateSessionSettingsRequestDTO`. */
-export function validateSessionSettingsInput(input: Record<SessionSettingsField, string>) {
+export function validateSessionSettingsInput(
+  input: Record<SessionSettingsField, string>,
+): SessionSettingsValidation {
   const fieldErrors: SessionSettingsFieldErrors = {};
   const parsed = {} as UpdateSessionSettingsInput;
 
-  for (const field of Object.keys(SETTINGS_LIMITS) as SessionSettingsField[]) {
+  for (const field of Object.keys(SETTINGS_LIMITS) as SessionSettingsNumericField[]) {
     const raw = input[field]?.trim() ?? "";
     const value = Number(raw);
     const { min, max } = SETTINGS_LIMITS[field];
@@ -46,6 +53,16 @@ export function validateSessionSettingsInput(input: Record<SessionSettingsField,
     parsed[field] = value;
   }
 
+  // Valor fora da lista só chega aqui por request forjado — o campo é um
+  // `<select>`. Recusar mesmo assim evita mandar ao backend um enum que ele
+  // devolveria como erro de desserialização, sem campo marcado na tela.
+  const period = input.sessionQuotaPeriod?.trim() as SessionQuotaPeriod;
+  if (!SESSION_QUOTA_PERIODS.includes(period)) {
+    fieldErrors.sessionQuotaPeriod = "Escolha um período válido.";
+  } else {
+    parsed.sessionQuotaPeriod = period;
+  }
+
   if (Object.keys(fieldErrors).length > 0) {
     return { valid: false as const, fieldErrors };
   }
@@ -56,7 +73,10 @@ export function validateSessionSettingsInput(input: Record<SessionSettingsField,
 /** Converte os erros do backend (`"campo: mensagem"`) em erro por campo. */
 export function mapSessionSettingsApiErrors(errors: string[]): SessionSettingsFieldErrors {
   const fieldErrors: SessionSettingsFieldErrors = {};
-  const fields = Object.keys(SETTINGS_LIMITS) as SessionSettingsField[];
+  const fields: SessionSettingsField[] = [
+    ...(Object.keys(SETTINGS_LIMITS) as SessionSettingsNumericField[]),
+    "sessionQuotaPeriod",
+  ];
 
   for (const entry of errors) {
     const [rawField, ...rest] = entry.split(":");

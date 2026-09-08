@@ -10,8 +10,8 @@ import lombok.RequiredArgsConstructor;
 /**
  * Rede de fundo da expiração: as leituras já reavaliam sob demanda, então este
  * job existe para fechar sessões abandonadas quando ninguém está consultando a
- * API — caso contrário elas continuariam ativas para o índice
- * {@code uq_collaborator_active_session}, bloqueando o colaborador.
+ * API — caso contrário elas continuariam contando como ativas na cota do
+ * colaborador, bloqueando o próximo agendamento dele.
  */
 @Component
 @RequiredArgsConstructor
