@@ -30,15 +30,16 @@ export function ViewCompanyModal({ company, onClose, onEdit }: ViewCompanyModalP
         { label: "E-mail", value: company.email },
         { label: "Telefone", value: formatPhone(company.phone) },
         { label: "Endereço", value: formatAddress(company), full: true },
-        { label: "Rede das cadeiras", value: company.wifiSsid ?? "Não configurada" },
         {
-          label: "Senha do Wi-Fi",
-          // A senha em si não vem da API; o que o operador precisa saber é se
-          // há uma guardada, e desde quando.
+          label: "Rede das cadeiras",
+          // Nem o SSID nem a senha chegam à Physical: quem cadastra a rede é a
+          // própria empresa, pela tela "Minha empresa". O que o operador
+          // precisa saber aqui é só se há uma configurada, para decidir se vale
+          // a pena empurrar a configuração para o dispositivo.
           value: company.wifiConfigured ? (
-            <Badge tone="success">Guardada</Badge>
+            <Badge tone="success">Configurada pela empresa</Badge>
           ) : (
-            <Badge tone="neutral">Ausente</Badge>
+            <Badge tone="neutral">Não configurada</Badge>
           ),
         },
         ...(company.wifiUpdatedAt

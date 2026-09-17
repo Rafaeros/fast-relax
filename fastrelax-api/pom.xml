@@ -133,6 +133,20 @@
 			<version>1.78.1</version>
 		</dependency>
 
+		<!--
+			COMANDOS DAS CADEIRAS VIA BROKER (RabbitMQ self-hosted, plugin rabbitmq_mqtt)
+
+			O firmware fala MQTT puro (PubSubClient); o backend fala AMQP nativo pela
+			exchange `amq.topic` que o plugin já expõe — o mesmo plugin traduz entre os
+			dois lados, então não é preciso um cliente MQTT aqui. O tópico
+			`fastrelax/chairs/<mac>/status` vira routing key `fastrelax.chairs.<mac>.status`
+			(barra -> ponto).
+		-->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-amqp</artifactId>
+		</dependency>
+
 		<!-- DOCUMENTAÇÃO OPENAPI / SWAGGER UI -->
 		<dependency>
 			<groupId>org.springdoc</groupId>

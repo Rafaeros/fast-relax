@@ -24,9 +24,16 @@ import {
 import { ChairsFilterModal } from "@/features/chairs/components/ChairsFilterModal";
 import { CreateChairModal } from "@/features/chairs/components/CreateChairModal";
 import { EditChairModal } from "@/features/chairs/components/EditChairModal";
+import { RenameChairModal } from "@/features/chairs/components/RenameChairModal";
 import { ViewChairModal } from "@/features/chairs/components/ViewChairModal";
+import { PushMqttAction } from "@/features/chairs/components/PushMqttAction";
 import { PushNetworkAction } from "@/features/chairs/components/PushNetworkAction";
-import type { Chair, ChairFilter, FirmwareOption } from "@/features/chairs/types/chair.types";
+import type {
+  Chair,
+  ChairFilter,
+  CompanyOption,
+  FirmwareOption,
+} from "@/features/chairs/types/chair.types";
 
 export type ChairsTableProps = {
   initialSlice: PageSlice<Chair>;
@@ -46,6 +53,8 @@ export type ChairsTableProps = {
   isPlatformTeam?: boolean;
   /** Versões do catálogo, para registrar o firmware gravado em cada cadeira. */
   firmwares?: FirmwareOption[];
+  /** Empresas para o cadastro escolher a dona do equipamento — só a plataforma cadastra. */
+  companies?: CompanyOption[];
 };
 
 export function ChairsTable({
@@ -54,6 +63,7 @@ export function ChairsTable({
   isAdmin = false,
   isPlatformTeam = false,
   firmwares = [],
+  companies = [],
 }: ChairsTableProps) {
   // Incrementar o sinal faz a tabela descartar o que está em tela e recarregar
   // da primeira página — é assim que cadastro e edição aparecem na hora.
@@ -173,6 +183,7 @@ export function ChairsTable({
             <ViewAction onClick={() => setViewing(row)} />
             <EditAction onClick={() => setEditing(row)} />
             {isPlatformTeam && <PushNetworkAction chair={row} onPushed={reload} />}
+            {isPlatformTeam && <PushMqttAction chair={row} onPushed={reload} />}
             {/*
               Ativar/desativar e remover refletem o contrato comercial com a
               Physical — o RH da empresa cliente não decide isso sobre o próprio
@@ -233,7 +244,15 @@ export function ChairsTable({
             searchValue={search}
             onSearchChange={setSearch}
             filter={<ChairsFilterModal value={filters} onApply={setFilters} />}
-            action={<CreateChairModal onCreated={reload} firmwares={firmwares} />}
+            // Cadastro é exclusivo da equipe da plataforma: é quem instala o
+            // equipamento e escolhe a empresa dona dele. O backend já bloqueia
+            // (`@access.isPlatformTeam()`); esconder aqui evita um formulário
+            // que terminaria em 403.
+            action={
+              isPlatformTeam ? (
+                <CreateChairModal onCreated={reload} firmwares={firmwares} companies={companies} />
+              ) : undefined
+            }
           />
         }
         emptyMessage={
@@ -253,12 +272,22 @@ export function ChairsTable({
         }}
       />
 
-      <EditChairModal
-        chair={editing}
-        onClose={() => setEditing(null)}
-        onUpdated={reload}
-        firmwares={firmwares}
-      />
+      {/*
+        A Physical edita tudo (MAC, IP, porta, firmware, BSSID); o RH só
+        renomeia — MAC, IP, porta, firmware e BSSID são propriedade física do
+        equipamento, fora do alcance do painel do cliente.
+      */}
+      {isPlatformTeam ? (
+        <EditChairModal
+          chair={editing}
+          onClose={() => setEditing(null)}
+          onUpdated={reload}
+          firmwares={firmwares}
+          companies={companies}
+        />
+      ) : (
+        <RenameChairModal chair={editing} onClose={() => setEditing(null)} onUpdated={reload} />
+      )}
     </>
   );
 }

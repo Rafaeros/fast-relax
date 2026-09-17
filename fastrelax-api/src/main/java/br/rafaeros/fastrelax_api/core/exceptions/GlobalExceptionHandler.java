@@ -53,6 +53,12 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponseDTO.warning(ex.getMessage()));
     }
 
+    @ExceptionHandler(DeviceUnauthorizedException.class)
+    public ResponseEntity<ApiResponseDTO<Void>> handleDeviceUnauthorized(DeviceUnauthorizedException ex) {
+        log.warn("Dispositivo recusado: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponseDTO.warning(ex.getMessage()));
+    }
+
     @ExceptionHandler(BadRequestException.class)
     public ResponseEntity<ApiResponseDTO<Void>> handleBadRequestException(BadRequestException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponseDTO.error(ex.getMessage()));

@@ -8,12 +8,15 @@ import {
   listCompanies,
   toggleCompanyActive,
   updateCompany,
+  updateMyCompanyWifi,
 } from "@/features/companies/services/company.service";
 import {
   mapCompanyApiErrors,
+  mapWifiApiErrors,
   validateCompanyInput,
+  validateWifiInput,
 } from "@/features/companies/schemas/company.schema";
-import type { Company, CompanyFormState } from "@/features/companies/types/company.types";
+import type { Company, CompanyFormState, WifiFormState } from "@/features/companies/types/company.types";
 import type { MutationResult } from "@/features/collaborators/types/collaborator.types";
 
 const ROUTE = "/painel/empresas";
@@ -110,9 +113,45 @@ function readAndValidate(formData: FormData) {
     street: String(formData.get("street") ?? ""),
     number: String(formData.get("number") ?? ""),
     complement: String(formData.get("complement") ?? ""),
+  });
+}
+
+const WIFI_ROUTE = "/painel/minha-empresa";
+
+/**
+ * Rede das cadeiras, cadastrada pela própria empresa (RH/gestor). A Physical
+ * não passa por aqui — ver `SaveWifiInput`.
+ */
+export async function updateMyWifiAction(
+  _previousState: WifiFormState,
+  formData: FormData,
+): Promise<WifiFormState> {
+  const validation = validateWifiInput({
     wifiSsid: String(formData.get("wifiSsid") ?? ""),
     wifiPassword: String(formData.get("wifiPassword") ?? ""),
   });
+
+  if (!validation.valid) {
+    return {
+      status: "error",
+      message: "Confira os campos destacados.",
+      fieldErrors: validation.fieldErrors,
+    };
+  }
+
+  const result = await updateMyCompanyWifi(validation.data);
+
+  if (!result.ok) {
+    const fieldErrors = mapWifiApiErrors(result.errors);
+    return {
+      status: "error",
+      message: result.message,
+      fieldErrors: Object.keys(fieldErrors).length > 0 ? fieldErrors : { wifiSsid: result.message },
+    };
+  }
+
+  revalidatePath(WIFI_ROUTE);
+  return { status: "success", message: result.message, company: result.data };
 }
 
 /**

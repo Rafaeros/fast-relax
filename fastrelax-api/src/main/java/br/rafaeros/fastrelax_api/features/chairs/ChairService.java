@@ -11,13 +11,19 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import br.rafaeros.fastrelax_api.core.crypto.CryptoService;
 import br.rafaeros.fastrelax_api.core.exceptions.BusinessException;
+import br.rafaeros.fastrelax_api.core.exceptions.DeviceUnauthorizedException;
 import br.rafaeros.fastrelax_api.core.exceptions.ResourceNotFoundException;
 import br.rafaeros.fastrelax_api.core.tenancy.CurrentTenant;
 import br.rafaeros.fastrelax_api.features.chairs.dtos.ChairFilterDTO;
 import br.rafaeros.fastrelax_api.features.chairs.dtos.ChairHeartbeatRequestDTO;
 import br.rafaeros.fastrelax_api.features.chairs.dtos.ChairResponseDTO;
+import br.rafaeros.fastrelax_api.features.chairs.dtos.CreateChairRequestDTO;
+import br.rafaeros.fastrelax_api.features.chairs.dtos.RenameChairRequestDTO;
 import br.rafaeros.fastrelax_api.features.chairs.dtos.SaveChairRequestDTO;
+import br.rafaeros.fastrelax_api.features.companies.Company;
+import br.rafaeros.fastrelax_api.features.companies.CompanyRepository;
 import br.rafaeros.fastrelax_api.features.firmwares.FirmwareRepository;
 import lombok.RequiredArgsConstructor;
 
@@ -27,10 +33,12 @@ import lombok.RequiredArgsConstructor;
 public class ChairService {
 
     private final ChairRepository chairRepository;
+    private final CompanyRepository companyRepository;
     private final FirmwareRepository firmwareRepository;
     private final CurrentTenant currentTenant;
     private final ChairClient chairClient;
     private final ApplicationEventPublisher eventPublisher;
+    private final CryptoService cryptoService;
 
     @Value("${app.chair.offline-after-seconds:180}")
     private int offlineAfterSeconds;
@@ -59,32 +67,54 @@ public class ChairService {
     }
 
     /**
-     * Cadastro pelo RH. Reativa a linha quando o MAC já existiu <em>na própria
-     * empresa</em>: é o mesmo hardware voltando, não uma cadeira nova.
+     * Cadastro pela equipe da plataforma, com a empresa dona explícita. Reativa a
+     * linha quando o MAC já existiu, tratando como um cadastro novo: todo campo
+     * enviado é reaplicado (inclusive empresa), e o que era específico do ciclo
+     * de vida anterior — pareamento de token, rede, MQTT — é zerado. A busca é
+     * global porque o MAC é único no sistema inteiro; sem problema revelar isso
+     * aqui porque só a equipe da plataforma chama este endpoint
+     * ({@code @access.isPlatformTeam()} no controller), que já enxerga todas as
+     * empresas.
      */
     @Transactional
-    public ChairResponseDTO create(SaveChairRequestDTO dto) {
+    public ChairResponseDTO create(CreateChairRequestDTO dto) {
+        Company company = companyRepository.findById(dto.companyId())
+                .orElseThrow(() -> new ResourceNotFoundException("Empresa não encontrada"));
         String macAddress = normalizeMac(dto.macAddress());
         Chair existing = chairRepository.findByMacAddressIncludingDeleted(macAddress).orElse(null);
 
         if (existing != null) {
-            // A busca é global porque o MAC é único no sistema inteiro. Cadeira de
-            // outro cliente responde igual a uma já cadastrada aqui: dizer "está em
-            // outra empresa" revelaria o parque instalado alheio.
-            if (existing.getDeletedAt() == null || !isOwnedByCurrentCompany(existing)) {
+            if (existing.getDeletedAt() == null) {
                 throw new BusinessException("Já existe uma cadeira cadastrada com este MAC address");
             }
+            // Pareamento, rede e MQTT eram do ciclo de vida anterior — não vale
+            // presumir que ainda batem, mesmo recadastrando na mesma empresa: o
+            // ESP32 físico pode ter sido resetado nesse meio-tempo (é exatamente
+            // o que causa "cadeira pareada com outro token no backend" logo após
+            // um recadastro). Confiança no primeiro contato de novo, como se a
+            // linha nunca tivesse existido.
+            existing.setDeviceTokenEncrypted(null);
+            existing.setNetworkSyncedAt(null);
+            existing.setReportedSsid(null);
+            existing.setMqttSyncedAt(null);
+            existing.setCompany(company);
             existing.restore();
-            applyFields(existing, dto, macAddress);
+            applyFields(existing, dto.name(), macAddress, dto.ipAddress(), dto.port(), dto.firmwareId(),
+                    dto.wifiBssid(), dto.mqttHost(), dto.mqttPort(), dto.mqttUsername(), dto.mqttPassword());
             return toResponse(chairRepository.save(existing));
         }
 
         Chair chair = new Chair();
-        chair.setCompany(currentTenant.reference());
-        applyFields(chair, dto, macAddress);
+        chair.setCompany(company);
+        applyFields(chair, dto.name(), macAddress, dto.ipAddress(), dto.port(), dto.firmwareId(), dto.wifiBssid(),
+                dto.mqttHost(), dto.mqttPort(), dto.mqttUsername(), dto.mqttPassword());
         return toResponse(chairRepository.save(chair));
     }
 
+    /**
+     * Edição completa, exclusiva da equipe da plataforma — inclui reatribuir a
+     * empresa dona, para quando o equipamento muda de cliente fisicamente.
+     */
     @Transactional
     public ChairResponseDTO update(Long id, SaveChairRequestDTO dto) {
         Chair chair = findEntityById(id);
@@ -96,7 +126,30 @@ public class ChairService {
                     throw new BusinessException("Já existe uma cadeira cadastrada com este MAC address");
                 });
 
-        applyFields(chair, dto, macAddress);
+        if (!Objects.equals(chair.companyId(), dto.companyId())) {
+            Company company = companyRepository.findById(dto.companyId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Empresa não encontrada"));
+            chair.setCompany(company);
+            // A rede sincronizada era da empresa antiga — sob outro Wi-Fi, o
+            // status "aplicada"/"enviada" passaria a mentir sobre uma
+            // configuração que não tem mais nada a ver com onde a cadeira está.
+            chair.setNetworkSyncedAt(null);
+            chair.setReportedSsid(null);
+        }
+
+        applyFields(chair, dto.name(), macAddress, dto.ipAddress(), dto.port(), dto.firmwareId(), dto.wifiBssid(),
+                dto.mqttHost(), dto.mqttPort(), dto.mqttUsername(), dto.mqttPassword());
+        return toResponse(chairRepository.save(chair));
+    }
+
+    /**
+     * Edição pelo RH/gestor da empresa: só o nome. MAC, IP, porta, firmware e
+     * BSSID continuam com quem instala o equipamento.
+     */
+    @Transactional
+    public ChairResponseDTO rename(Long id, RenameChairRequestDTO dto) {
+        Chair chair = findEntityById(id);
+        chair.setName(dto.name());
         return toResponse(chairRepository.save(chair));
     }
 
@@ -133,19 +186,21 @@ public class ChairService {
      *
      * <p>
      * Chega sem tenant no contexto — o dispositivo não faz login, só apresenta o
-     * segredo do firmware e o próprio MAC. É a cadeira encontrada que diz de qual
-     * empresa é, e por isso a busca aqui é global de propósito.
+     * token e o próprio MAC. É a cadeira encontrada que diz de qual empresa é, e
+     * por isso a busca aqui é global de propósito.
      *
      * <p>
      * Só reconhece MAC já cadastrado: um dispositivo desconhecido na rede não se
      * auto-registra como cadeira, nem escolhe a empresa em que entra.
      */
     @Transactional
-    public ChairResponseDTO registerHeartbeat(ChairHeartbeatRequestDTO dto) {
+    public ChairResponseDTO registerHeartbeat(ChairHeartbeatRequestDTO dto, String deviceToken) {
         String macAddress = normalizeMac(dto.macAddress());
         Chair chair = chairRepository.findByMacAddress(macAddress)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Cadeira não cadastrada para o MAC " + macAddress));
+
+        authenticateDevice(chair, deviceToken);
 
         chair.setIpAddress(dto.ipAddress());
         if (dto.port() != null) {
@@ -162,6 +217,26 @@ public class ChairService {
     }
 
     /**
+     * Confiança no primeiro contato: a cadeira gera o próprio token no boot
+     * (NVS) e o backend grava o que receber na primeira vez que a vir. Dali em
+     * diante, exige que bata — sem isso, bastaria saber o MAC (impresso na
+     * etiqueta do ESP32) para uma máquina qualquer da rede assumir a
+     * identidade da cadeira.
+     */
+    private void authenticateDevice(Chair chair, String providedToken) {
+        if (providedToken == null || providedToken.isBlank()) {
+            throw new DeviceUnauthorizedException("Token do dispositivo ausente");
+        }
+        if (chair.getDeviceTokenEncrypted() == null) {
+            chair.setDeviceTokenEncrypted(cryptoService.encrypt(providedToken));
+            return;
+        }
+        if (!providedToken.equals(cryptoService.decrypt(chair.getDeviceTokenEncrypted()))) {
+            throw new DeviceUnauthorizedException("Token do dispositivo não confere");
+        }
+    }
+
+    /**
      * Sincroniza a estabilização com o que o firmware está de fato contando.
      *
      * <p>
@@ -175,15 +250,7 @@ public class ChairService {
      * estimada segue valendo até expirar sozinha.
      */
     private void applyPhase(Chair chair, ChairHeartbeatRequestDTO dto) {
-        if (dto.phase() == null || dto.phase().isBlank()) {
-            return;
-        }
-        if (!dto.isCoolingDown()) {
-            chair.applyCooldown(0);
-            return;
-        }
-        int remaining = dto.remainingSeconds() != null ? dto.remainingSeconds() : cooldownSeconds;
-        chair.applyCooldown(remaining);
+        chair.applyPhase(dto.phase(), dto.remainingSeconds(), cooldownSeconds);
     }
 
     /**
@@ -260,27 +327,81 @@ public class ChairService {
                 .toList();
     }
 
-    private boolean isOwnedByCurrentCompany(Chair chair) {
-        return Objects.equals(chair.companyId(), currentTenant.companyId());
-    }
-
-    private void applyFields(Chair chair, SaveChairRequestDTO dto, String macAddress) {
-        chair.setName(dto.name());
+    private void applyFields(Chair chair, String name, String macAddress, String ipAddress, Integer port,
+            Long firmwareId, String wifiBssid, String mqttHost, Integer mqttPort, String mqttUsername,
+            String mqttPassword) {
+        chair.setName(name);
         chair.setMacAddress(macAddress);
-        if (dto.ipAddress() != null && !dto.ipAddress().isBlank()) {
-            chair.setIpAddress(dto.ipAddress().trim());
+        if (ipAddress != null && !ipAddress.isBlank()) {
+            chair.setIpAddress(ipAddress.trim());
         }
-        if (dto.port() != null) {
-            chair.setPort(dto.port());
+        if (port != null) {
+            chair.setPort(port);
         }
-        if (dto.firmwareId() != null) {
-            chair.setFirmware(firmwareRepository.findById(dto.firmwareId())
+        if (firmwareId != null) {
+            chair.setFirmware(firmwareRepository.findById(firmwareId)
                     .orElseThrow(() -> new ResourceNotFoundException("Firmware não encontrado")));
         }
         // Em branco apaga a fixação: é assim que se volta a deixar o ESP32
         // escolher o AP sozinho, sem precisar de outro campo para isso.
-        String bssid = dto.wifiBssid() == null ? "" : dto.wifiBssid().trim().toUpperCase().replace('-', ':');
+        String bssid = wifiBssid == null ? "" : wifiBssid.trim().toUpperCase().replace('-', ':');
         chair.setWifiBssid(bssid.isEmpty() ? null : bssid);
+
+        applyMqttOverride(chair, mqttHost, mqttPort, mqttUsername, mqttPassword);
+    }
+
+    /**
+     * Broker MQTT específico desta cadeira, mesmo critério do wifiBssid: em
+     * branco apaga o override e volta a valer o padrão global.
+     *
+     * <p>
+     * A senha segue regra própria: em branco <em>mantém</em> a já gravada, ao
+     * contrário do host/porta/usuário. Reenviar o formulário de edição sem
+     * digitar a senha de novo não deveria apagá-la — só o host em branco limpa
+     * tudo, host preenchido nunca apaga a senha sozinho.
+     */
+    private void applyMqttOverride(Chair chair, String mqttHost, Integer mqttPort, String mqttUsername,
+            String mqttPassword) {
+        String host = blankToNull(mqttHost);
+
+        if (host == null) {
+            if (chair.hasMqttOverride()) {
+                // Não se sabe mais qual broker o dispositivo tem gravado: a
+                // config enviada era a de um override que acabou de sumir.
+                chair.setMqttSyncedAt(null);
+            }
+            chair.setMqttHost(null);
+            chair.setMqttPort(null);
+            chair.setMqttUsername(null);
+            chair.setMqttPasswordEncrypted(null);
+            return;
+        }
+
+        String username = blankToNull(mqttUsername);
+        boolean changed = !host.equals(chair.getMqttHost())
+                || !Objects.equals(mqttPort, chair.getMqttPort())
+                || !Objects.equals(username, chair.getMqttUsername());
+
+        chair.setMqttHost(host);
+        chair.setMqttPort(mqttPort);
+        chair.setMqttUsername(username);
+
+        if (mqttPassword != null && !mqttPassword.isBlank()) {
+            chair.setMqttPasswordEncrypted(cryptoService.encrypt(mqttPassword));
+            changed = true;
+        }
+
+        if (changed) {
+            chair.setMqttSyncedAt(null);
+        }
+    }
+
+    private String blankToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     /** Aceita "aa-bb-cc-dd-ee-ff" e grava sempre em maiúsculas com dois-pontos. */

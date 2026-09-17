@@ -6,8 +6,9 @@ import { ChairsTable } from "@/features/chairs/components/ChairsTable";
 import { listChairs } from "@/features/chairs/services/chair.service";
 import { requirePanelUser } from "@/features/authentication/lib/guards";
 import { administersCompany, isPlatformTeam } from "@/features/authentication/lib/roles";
+import { listCompanies } from "@/features/companies/services/company.service";
 import { listFirmwareOptions } from "@/features/firmwares/services/firmware.service";
-import type { Chair, FirmwareOption } from "@/features/chairs/types/chair.types";
+import type { Chair, CompanyOption, FirmwareOption } from "@/features/chairs/types/chair.types";
 
 export const metadata: Metadata = {
   title: "Cadeiras — physical",
@@ -19,6 +20,7 @@ export default async function CadeirasPage() {
   // ela quem instala o equipamento e configura a rede dele. Cadeira é ativo da
   // Physical — colaborador e sessão continuam fora do alcance dela.
   const user = await requirePanelUser(["SYSADMIN", "COMPANY_ADMIN", "COMPANY_RH"]);
+  const platform = isPlatformTeam(user);
 
   // Primeira página no servidor: a tabela chega preenchida, sem piscar vazia.
   // As versões vêm junto porque o formulário precisa delas ao abrir.
@@ -33,6 +35,11 @@ export default async function CadeirasPage() {
       }))
     : [];
 
+  // Só a equipe da plataforma cadastra cadeira, e só ela escolhe a empresa
+  // dona do equipamento — para os demais buscar aqui seria uma chamada
+  // garantida a tomar 403.
+  const companies: CompanyOption[] = platform ? await loadCompanyOptions() : [];
+
   return (
     // Altura de uma tela: a lista rola dentro da tabela, o resto fica parado.
     <div className="flex h-full min-h-0 flex-col gap-4">
@@ -46,10 +53,19 @@ export default async function CadeirasPage() {
         initialSlice={initialSlice}
         loadPage={fetchChairsPage}
         // O teste de relé aciona o equipamento de verdade: fica com o gestor.
-        isAdmin={administersCompany(user) || isPlatformTeam(user)}
-        isPlatformTeam={isPlatformTeam(user)}
+        isAdmin={administersCompany(user) || platform}
+        isPlatformTeam={platform}
         firmwares={firmwareOptions}
+        companies={companies}
       />
     </div>
   );
+}
+
+/** Só id e nome chegam ao cliente: o select não precisa do cadastro inteiro. */
+async function loadCompanyOptions(): Promise<CompanyOption[]> {
+  const result = await listCompanies({ page: 0, size: 200 });
+  if (!result.ok) return [];
+
+  return result.data.content.map((company) => ({ id: company.id, name: company.name }));
 }

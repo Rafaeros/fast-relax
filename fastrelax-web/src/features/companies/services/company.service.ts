@@ -7,6 +7,7 @@ import type {
   Company,
   ListCompaniesParams,
   SaveCompanyInput,
+  SaveWifiInput,
 } from "@/features/companies/types/company.types";
 
 /**
@@ -43,6 +44,21 @@ export async function getCompany(id: number): Promise<ApiResult<Company>> {
 /** A própria empresa de quem está logado — o que a tela "Minha empresa" do RH usa. */
 export async function getMyCompany(): Promise<ApiResult<Company>> {
   return apiFetch<Company>(`${RESOURCE}/me`, { token: await readAccessToken() });
+}
+
+/**
+ * Rede das cadeiras, cadastrada pela própria empresa.
+ *
+ * <p>
+ * A Physical não passa por aqui: ela só aplica a rede ao dispositivo pelo
+ * push de `/chairs/{id}/network`, sem nunca ver SSID nem senha.
+ */
+export async function updateMyCompanyWifi(input: SaveWifiInput): Promise<ApiResult<Company>> {
+  return apiFetch<Company>(`${RESOURCE}/me/wifi`, {
+    method: "PATCH",
+    body: input,
+    token: await readAccessToken(),
+  });
 }
 
 export async function createCompany(input: SaveCompanyInput): Promise<ApiResult<Company>> {

@@ -6,13 +6,20 @@ import {
   createChair,
   deleteChair,
   listChairs,
+  pushChairMqtt,
   pushChairNetwork,
   pushCompanyNetwork,
+  renameChair,
   testChairRelay,
   toggleChairActive,
   updateChair,
 } from "@/features/chairs/services/chair.service";
-import { mapChairApiErrors, validateChairInput } from "@/features/chairs/schemas/chair.schema";
+import {
+  mapChairApiErrors,
+  validateChairInput,
+  validateCreateChairInput,
+  validateRenameChairInput,
+} from "@/features/chairs/schemas/chair.schema";
 import type {
   Chair,
   ChairFilter,
@@ -46,10 +53,15 @@ function readFormFields(formData: FormData) {
   return {
     name: String(formData.get("name") ?? ""),
     macAddress: String(formData.get("macAddress") ?? ""),
+    companyId: String(formData.get("companyId") ?? ""),
     ipAddress: String(formData.get("ipAddress") ?? ""),
     port: String(formData.get("port") ?? ""),
     firmwareId: String(formData.get("firmwareId") ?? ""),
     wifiBssid: String(formData.get("wifiBssid") ?? ""),
+    mqttHost: String(formData.get("mqttHost") ?? ""),
+    mqttPort: String(formData.get("mqttPort") ?? ""),
+    mqttUsername: String(formData.get("mqttUsername") ?? ""),
+    mqttPassword: String(formData.get("mqttPassword") ?? ""),
   };
 }
 
@@ -65,7 +77,9 @@ function toErrorState(message: string, errors: string[]): ChairFormState {
 }
 
 /**
- * Cadastra a cadeira.
+ * Cadastra a cadeira. Exclusivo da equipe da plataforma — é ela quem instala
+ * o equipamento e escolhe a empresa dona dele.
+ *
  * MAC repetido é decidido pelo backend (`BusinessException` → 400): a mensagem
  * dele volta marcada no campo, sem consulta prévia que abriria janela para
  * corrida entre dois cadastros.
@@ -74,7 +88,7 @@ export async function createChairAction(
   _previousState: ChairFormState,
   formData: FormData,
 ): Promise<ChairFormState> {
-  const validation = validateChairInput(readFormFields(formData));
+  const validation = validateCreateChairInput(readFormFields(formData));
 
   if (!validation.valid) {
     return {
@@ -85,6 +99,40 @@ export async function createChairAction(
   }
 
   const result = await createChair(validation.data);
+
+  if (!result.ok) {
+    return toErrorState(result.message, result.errors);
+  }
+
+  revalidatePath(ROUTE);
+  return { status: "success", message: result.message };
+}
+
+/**
+ * Renomeia a cadeira. É a única edição que o RH/gestor da empresa alcança —
+ * MAC, IP, porta, firmware e BSSID continuam com quem instala o equipamento.
+ */
+export async function renameChairAction(
+  _previousState: ChairFormState,
+  formData: FormData,
+): Promise<ChairFormState> {
+  const id = Number(formData.get("id"));
+
+  if (!id || Number.isNaN(id)) {
+    return { status: "error", message: "Cadeira não identificada." };
+  }
+
+  const validation = validateRenameChairInput({ name: String(formData.get("name") ?? "") });
+
+  if (!validation.valid) {
+    return {
+      status: "error",
+      message: "Confira os campos destacados.",
+      fieldErrors: validation.fieldErrors,
+    };
+  }
+
+  const result = await renameChair(id, validation.data);
 
   if (!result.ok) {
     return toErrorState(result.message, result.errors);
@@ -166,6 +214,20 @@ export async function deleteChairAction(id: number): Promise<MutationResult> {
  */
 export async function pushChairNetworkAction(id: number): Promise<MutationResult> {
   const result = await pushChairNetwork(id);
+  if (result.ok) revalidatePath(ROUTE);
+
+  return { ok: result.ok, message: result.message };
+}
+
+/**
+ * Grava o broker MQTT (override desta cadeira, ou o padrão global se nenhum
+ * foi configurado) na memória do ESP32.
+ *
+ * <p>
+ * Só a equipe da plataforma alcança — mesma razão do push de rede.
+ */
+export async function pushChairMqttAction(id: number): Promise<MutationResult> {
+  const result = await pushChairMqtt(id);
   if (result.ok) revalidatePath(ROUTE);
 
   return { ok: result.ok, message: result.message };

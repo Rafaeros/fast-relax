@@ -5,8 +5,11 @@ import { buildQuery } from "@/lib/api/query";
 import { readAccessToken } from "@/features/authentication/services/session.service";
 import type {
   Chair,
+  ChairMqttResult,
   ChairNetworkResult,
+  CreateChairInput,
   ListChairsParams,
+  RenameChairInput,
   SaveChairInput,
 } from "@/features/chairs/types/chair.types";
 
@@ -48,7 +51,8 @@ export async function getChair(id: number): Promise<ApiResult<Chair>> {
   return apiFetch<Chair>(`${RESOURCE}/${id}`, { token: await readAccessToken() });
 }
 
-export async function createChair(input: SaveChairInput): Promise<ApiResult<Chair>> {
+/** Exclusivo da equipe da plataforma no backend — só ela cadastra o equipamento. */
+export async function createChair(input: CreateChairInput): Promise<ApiResult<Chair>> {
   return apiFetch<Chair>(RESOURCE, {
     method: "POST",
     body: input,
@@ -56,12 +60,25 @@ export async function createChair(input: SaveChairInput): Promise<ApiResult<Chai
   });
 }
 
+/** Edição completa (MAC, IP, porta, firmware, BSSID) — exclusiva da equipe da plataforma. */
 export async function updateChair(
   id: number,
   input: SaveChairInput,
 ): Promise<ApiResult<Chair>> {
   return apiFetch<Chair>(`${RESOURCE}/${id}`, {
     method: "PUT",
+    body: input,
+    token: await readAccessToken(),
+  });
+}
+
+/** Edição do RH/gestor da empresa: só o nome. */
+export async function renameChair(
+  id: number,
+  input: RenameChairInput,
+): Promise<ApiResult<Chair>> {
+  return apiFetch<Chair>(`${RESOURCE}/${id}/name`, {
+    method: "PATCH",
     body: input,
     token: await readAccessToken(),
   });
@@ -119,6 +136,23 @@ export async function pushCompanyNetwork(
   companyId: number,
 ): Promise<ApiResult<ChairNetworkResult[]>> {
   return apiFetch<ChairNetworkResult[]>(`${RESOURCE}/network/company/${companyId}`, {
+    method: "POST",
+    token: await readAccessToken(),
+  });
+}
+
+/**
+ * Grava o broker MQTT na memória do ESP32 — o override desta cadeira, se
+ * houver, ou o padrão global (mesmo que o firmware já traz embutido em
+ * config.h) quando nenhum foi configurado.
+ *
+ * <p>
+ * Exclusivo da equipe da plataforma no backend. A senha não passa por aqui:
+ * sai cifrada do cadastro da cadeira (quando há override) e é decifrada só no
+ * instante do envio ao dispositivo.
+ */
+export async function pushChairMqtt(id: number): Promise<ApiResult<ChairMqttResult>> {
+  return apiFetch<ChairMqttResult>(`${RESOURCE}/${id}/mqtt`, {
     method: "POST",
     token: await readAccessToken(),
   });

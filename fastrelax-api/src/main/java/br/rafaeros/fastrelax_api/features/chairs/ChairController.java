@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -24,8 +25,11 @@ import org.springframework.web.bind.annotation.RestController;
 import br.rafaeros.fastrelax_api.core.dto.ApiResponseDTO;
 import br.rafaeros.fastrelax_api.features.chairs.dtos.ChairFilterDTO;
 import br.rafaeros.fastrelax_api.features.chairs.dtos.ChairHeartbeatRequestDTO;
+import br.rafaeros.fastrelax_api.features.chairs.dtos.ChairMqttResultDTO;
 import br.rafaeros.fastrelax_api.features.chairs.dtos.ChairNetworkResultDTO;
 import br.rafaeros.fastrelax_api.features.chairs.dtos.ChairResponseDTO;
+import br.rafaeros.fastrelax_api.features.chairs.dtos.CreateChairRequestDTO;
+import br.rafaeros.fastrelax_api.features.chairs.dtos.RenameChairRequestDTO;
 import br.rafaeros.fastrelax_api.features.chairs.dtos.SaveChairRequestDTO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -40,17 +44,24 @@ public class ChairController {
 
     private final ChairService chairService;
     private final ChairNetworkService networkService;
+    private final ChairMqttConfigService mqttConfigService;
     private final ChairCommandService chairCommandService;
 
     /**
      * Batida periódica do ESP32. Autenticada pelo token de dispositivo, não por
      * JWT — o hardware não faz login.
+     *
+     * <p>
+     * O token é da própria cadeira (gerada por ela no primeiro boot), não um
+     * segredo único compartilhado: o primeiro heartbeat pareia, os seguintes
+     * exigem que bata — ver {@code ChairService#registerHeartbeat}.
      */
     @PostMapping("/heartbeat")
     @Operation(summary = "Heartbeat do ESP32: informa que está online e atualiza o IP")
     public ResponseEntity<ApiResponseDTO<ChairResponseDTO>> heartbeat(
+            @RequestHeader(value = "X-Device-Token", required = false) String deviceToken,
             @RequestBody @Valid ChairHeartbeatRequestDTO dto) {
-        return ResponseEntity.ok(ApiResponseDTO.success(chairService.registerHeartbeat(dto),
+        return ResponseEntity.ok(ApiResponseDTO.success(chairService.registerHeartbeat(dto, deviceToken),
                 "Heartbeat registrado"));
     }
 
@@ -75,22 +86,40 @@ public class ChairController {
         return ResponseEntity.ok(ApiResponseDTO.success(chairService.findById(id), "Cadeira encontrada"));
     }
 
+    /**
+     * Exclusivo da equipe da plataforma: é quem instala o equipamento e decide a
+     * empresa dona dele. O RH não cadastra cadeira.
+     */
     @PostMapping
-    @PreAuthorize("@access.operatesCompany()")
-    @Operation(summary = "Cadastra uma cadeira pelo MAC address do ESP32")
+    @PreAuthorize("@access.isPlatformTeam()")
+    @Operation(summary = "Cadastra uma cadeira pelo MAC address do ESP32 (somente Physical)")
     public ResponseEntity<ApiResponseDTO<ChairResponseDTO>> create(
-            @RequestBody @Valid SaveChairRequestDTO dto) {
+            @RequestBody @Valid CreateChairRequestDTO dto) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponseDTO.success(chairService.create(dto), "Cadeira cadastrada com sucesso"));
     }
 
+    /** Edição completa (MAC, IP, porta, firmware, BSSID): somente Physical. */
     @PutMapping("/{id}")
-    @PreAuthorize("@access.operatesCompany()")
-    @Operation(summary = "Atualiza os dados de uma cadeira")
+    @PreAuthorize("@access.isPlatformTeam()")
+    @Operation(summary = "Atualiza os dados físicos de uma cadeira (somente Physical)")
     public ResponseEntity<ApiResponseDTO<ChairResponseDTO>> update(@PathVariable Long id,
             @RequestBody @Valid SaveChairRequestDTO dto) {
         return ResponseEntity.ok(ApiResponseDTO.success(chairService.update(id, dto),
                 "Cadeira atualizada com sucesso"));
+    }
+
+    /**
+     * Edição do RH/gestor da empresa: só o nome. O restante do cadastro é
+     * propriedade física do equipamento, fora do alcance do painel do cliente.
+     */
+    @PatchMapping("/{id}/name")
+    @PreAuthorize("@access.operatesCompany()")
+    @Operation(summary = "Renomeia uma cadeira da própria empresa")
+    public ResponseEntity<ApiResponseDTO<ChairResponseDTO>> rename(@PathVariable Long id,
+            @RequestBody @Valid RenameChairRequestDTO dto) {
+        return ResponseEntity.ok(ApiResponseDTO.success(chairService.rename(id, dto),
+                "Cadeira renomeada com sucesso"));
     }
 
     /**
@@ -167,5 +196,22 @@ public class ChairController {
         long delivered = results.stream().filter(ChairNetworkResultDTO::delivered).count();
         return ResponseEntity.ok(ApiResponseDTO.success(results,
                 delivered + " de " + results.size() + " cadeira(s) receberam a configuração"));
+    }
+
+    /**
+     * Grava host, porta, usuário e senha do broker MQTT na memória do ESP32.
+     *
+     * <p>
+     * Exclusiva da equipe da plataforma, mesma razão de /network. Diferente do
+     * Wi-Fi, a maioria das cadeiras nunca precisa disto: o broker padrão já
+     * bate com o que o firmware traz embutido em config.h — esta rota só
+     * importa para quem configurou um override no cadastro da cadeira.
+     */
+    @PostMapping("/{id}/mqtt")
+    @PreAuthorize("@access.isPlatformTeam()")
+    @Operation(summary = "Envia host, porta, usuário e senha do broker MQTT para o ESP32 gravar na memória")
+    public ResponseEntity<ApiResponseDTO<ChairMqttResultDTO>> pushMqtt(@PathVariable Long id) {
+        ChairMqttResultDTO result = mqttConfigService.push(id);
+        return ResponseEntity.ok(ApiResponseDTO.success(result, result.message()));
     }
 }

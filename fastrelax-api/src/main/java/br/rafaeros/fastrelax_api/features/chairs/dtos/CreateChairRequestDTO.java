@@ -8,11 +8,14 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 /**
- * Edição completa de cadeira, exclusiva da equipe da plataforma — inclui
- * reatribuir o equipamento a outra empresa (a cadeira mudou de cliente
- * fisicamente). O RH edita só o nome, pelo {@code RenameChairRequestDTO}.
+ * Cadastro de cadeira, exclusivo da equipe da plataforma.
+ *
+ * <p>
+ * Quem instala o equipamento escolhe a empresa dona dele — por isso
+ * {@code companyId} é obrigatório aqui e não existe em {@link SaveChairRequestDTO},
+ * que é a edição, restrita à mesma equipe e sem reatribuição de empresa.
  */
-public record SaveChairRequestDTO(
+public record CreateChairRequestDTO(
     @NotBlank(message = "O nome é obrigatório")
     @Size(min = 2, max = 100, message = "O nome deve ter entre 2 e 100 caracteres")
     String name,
@@ -38,21 +41,12 @@ public record SaveChairRequestDTO(
     /**
      * Ponto de acesso em que esta cadeira deve entrar, dentro do SSID da
      * empresa. Em branco deixa o ESP32 escolher o de melhor sinal.
-     *
-     * <p>
-     * Fixar importa em planta com vários APs no mesmo nome de rede: sem isso a
-     * cadeira pode grudar num ponto distante e ficar com sinal ruim tendo um AP
-     * a três metros.
      */
     @Pattern(regexp = "^(|([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2})$",
             message = "BSSID inválido. Use o formato AA:BB:CC:DD:EE:FF")
     String wifiBssid,
 
-    /**
-     * Broker MQTT específico desta cadeira. Em branco usa o padrão global — o
-     * caso comum, que a maioria das cadeiras nunca precisa sair de. Cada campo
-     * cai individualmente no padrão quando vazio.
-     */
+    /** Broker MQTT específico desta cadeira. Em branco usa o padrão global. */
     String mqttHost,
 
     @Min(value = 1, message = "Porta inválida")
@@ -61,9 +55,5 @@ public record SaveChairRequestDTO(
 
     String mqttUsername,
 
-    /**
-     * Em branco mantém a senha já gravada — reenviar o formulário sem digitar
-     * de novo não deveria apagá-la. Só é escrita quando vem preenchida.
-     */
     String mqttPassword
 ) {}

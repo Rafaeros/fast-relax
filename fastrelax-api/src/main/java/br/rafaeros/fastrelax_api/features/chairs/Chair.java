@@ -106,6 +106,47 @@ public class Chair extends SoftDeletableCompanyEntity {
     private String reportedSsid;
 
     /**
+     * Broker MQTT específico desta cadeira. Nulo/vazio usa o padrão global
+     * ({@code app.mqtt.device-*}), que é o caso comum — o mesmo broker que o
+     * firmware já traz embutido em config.h. Existe por cadeira, e não por
+     * empresa, pelo mesmo motivo do {@link #wifiBssid}: um override raro que
+     * não deveria arrastar o parque inteiro junto.
+     */
+    @Column(name = "mqtt_host", length = 255)
+    private String mqttHost;
+
+    @Column(name = "mqtt_port")
+    private Integer mqttPort;
+
+    @Column(name = "mqtt_username", length = 100)
+    private String mqttUsername;
+
+    /**
+     * Cifrada (AES-GCM, mesmo {@code CryptoService} do CPF, da senha de Wi-Fi
+     * e do token de dispositivo). Nunca aparece em claro em DTO nenhum.
+     */
+    @Column(name = "mqtt_password_encrypted", columnDefinition = "TEXT")
+    private String mqttPasswordEncrypted;
+
+    /** Quando o ESP32 confirmou ter gravado a configuração de MQTT na NVS. */
+    @Column(name = "mqtt_synced_at")
+    private LocalDateTime mqttSyncedAt;
+
+    /**
+     * Segredo desta cadeira, cifrado (AES-GCM, mesmo {@code CryptoService} do
+     * CPF e da senha de Wi-Fi).
+     *
+     * <p>
+     * Gerado pelo próprio ESP32 no primeiro boot, não pela plataforma — nulo
+     * até o primeiro heartbeat, que é quando o backend o vê e grava
+     * (confiança no primeiro contato). Substitui o antigo segredo único
+     * compartilhado entre todas as cadeiras: dali em diante, um MAC com token
+     * divergente é recusado.
+     */
+    @Column(name = "device_token_encrypted", columnDefinition = "TEXT")
+    private String deviceTokenEncrypted;
+
+    /**
      * A cadeira está na rede que a empresa configurou.
      *
      * <p>
@@ -119,6 +160,11 @@ public class Chair extends SoftDeletableCompanyEntity {
             return false;
         }
         return getCompany().getWifiSsid().equals(reportedSsid);
+    }
+
+    /** Tem broker próprio configurado; sem isto, vale o padrão global. */
+    public boolean hasMqttOverride() {
+        return mqttHost != null && !mqttHost.isBlank();
     }
 
     /**
@@ -162,5 +208,30 @@ public class Chair extends SoftDeletableCompanyEntity {
      */
     public void applyCooldown(long seconds) {
         cooldownUntil = seconds > 0 ? LocalDateTime.now().plusSeconds(seconds) : null;
+    }
+
+    /**
+     * Aplica a fase que o firmware relatou — heartbeat HTTP ou status MQTT, as
+     * duas fontes usam o mesmo vocabulário ({@code idle}, {@code cooldown}
+     * etc.), porque as duas leem o mesmo {@code session::Snapshot} do lado do
+     * ESP32.
+     *
+     * <p>
+     * Fica na entidade, e não duplicada nos dois serviços que a chamam, porque
+     * é a mesma regra de negócio (fase diferente de cooldown = livre) nos dois
+     * transportes.
+     *
+     * @param defaultCooldownSeconds usado quando a fase é cooldown mas o
+     *                                firmware não informou quanto falta
+     */
+    public void applyPhase(String phase, Integer remainingSeconds, int defaultCooldownSeconds) {
+        if (phase == null || phase.isBlank()) {
+            return;
+        }
+        if (!"cooldown".equalsIgnoreCase(phase)) {
+            applyCooldown(0);
+            return;
+        }
+        applyCooldown(remainingSeconds != null ? remainingSeconds : defaultCooldownSeconds);
     }
 }

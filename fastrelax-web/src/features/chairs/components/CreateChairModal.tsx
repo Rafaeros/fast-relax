@@ -4,18 +4,20 @@ import { useState, useTransition, type FormEvent } from "react";
 import { Button, Icon, Modal, useToast } from "@/components/ui";
 import { createChairAction } from "@/features/chairs/actions/chair.actions";
 import { ChairFormFields } from "@/features/chairs/components/ChairFormFields";
-import type { FirmwareOption } from "@/features/chairs/types/chair.types";
+import type { CompanyOption, FirmwareOption } from "@/features/chairs/types/chair.types";
 import { CHAIR_INITIAL_STATE } from "@/features/chairs/types/chair.types";
 import { hasFieldErrors } from "@/lib/forms";
 
 export type CreateChairModalProps = {
   /** Versões do catálogo, para registrar o firmware gravado. */
   firmwares?: FirmwareOption[];
+  /** Empresas para escolher a dona do equipamento — cadastro é só da plataforma. */
+  companies: CompanyOption[];
   /** Disparado após o cadastro dar certo — a tabela recarrega a partir daqui. */
   onCreated: () => void;
 };
 
-export function CreateChairModal({ onCreated, firmwares }: CreateChairModalProps) {
+export function CreateChairModal({ onCreated, firmwares, companies }: CreateChairModalProps) {
   const [open, setOpen] = useState(false);
   const [state, setState] = useState(CHAIR_INITIAL_STATE);
   const [pending, startTransition] = useTransition();
@@ -96,7 +98,12 @@ export function CreateChairModal({ onCreated, firmwares }: CreateChairModalProps
           className="flex flex-col gap-5"
           noValidate
         >
-          <ChairFormFields fieldErrors={fieldErrors} disabled={pending} firmwares={firmwares} />
+          <ChairFormFields
+            fieldErrors={fieldErrors}
+            disabled={pending}
+            firmwares={firmwares}
+            companies={companies}
+          />
         </form>
       </Modal>
     </>

@@ -1,18 +1,12 @@
 "use client";
 
 import { useState, useTransition, type FormEvent } from "react";
-import { Button, Icon, Modal, useToast } from "@/components/ui";
-import { updateChairAction } from "@/features/chairs/actions/chair.actions";
-import { ChairFormFields } from "@/features/chairs/components/ChairFormFields";
-import type { CompanyOption, FirmwareOption } from "@/features/chairs/types/chair.types";
+import { Button, Icon, Input, Modal, useToast } from "@/components/ui";
+import { renameChairAction } from "@/features/chairs/actions/chair.actions";
 import { CHAIR_INITIAL_STATE, type Chair } from "@/features/chairs/types/chair.types";
 import { hasFieldErrors } from "@/lib/forms";
 
-export type EditChairModalProps = {
-  /** Versões do catálogo, para registrar o firmware gravado. */
-  firmwares?: FirmwareOption[];
-  /** Empresas para o select de dono — Physical pode reatribuir a cadeira aqui. */
-  companies?: CompanyOption[];
+export type RenameChairModalProps = {
   /** `null` mantém o modal fechado — o pai guarda a linha selecionada. */
   chair: Chair | null;
   onClose: () => void;
@@ -20,7 +14,16 @@ export type EditChairModalProps = {
   onUpdated: () => void;
 };
 
-export function EditChairModal({ chair, onClose, onUpdated, firmwares, companies }: EditChairModalProps) {
+/**
+ * Edição do RH/gestor da empresa: só o nome.
+ *
+ * <p>
+ * MAC, IP, porta, firmware e BSSID são propriedade física do equipamento —
+ * quem instala e substitui hardware é a equipe da plataforma. Um modal à
+ * parte, em vez de desabilitar campos do {@code EditChairModal}, porque os
+ * outros valores nem deveriam chegar ao painel do cliente.
+ */
+export function RenameChairModal({ chair, onClose, onUpdated }: RenameChairModalProps) {
   const [state, setState] = useState(CHAIR_INITIAL_STATE);
   const [pending, startTransition] = useTransition();
   const toast = useToast();
@@ -37,7 +40,7 @@ export function EditChairModal({ chair, onClose, onUpdated, firmwares, companies
     const formData = new FormData(event.currentTarget);
 
     startTransition(async () => {
-      const result = await updateChairAction(state, formData);
+      const result = await renameChairAction(state, formData);
 
       if (result.status === "success") {
         setState(CHAIR_INITIAL_STATE);
@@ -47,8 +50,6 @@ export function EditChairModal({ chair, onClose, onUpdated, firmwares, companies
         return;
       }
 
-      // Erro de campo fica no formulário, ao lado do input a corrigir. O recado
-      // geral do servidor vai para o toast, que não depende do modal aberto.
       if (result.message && !hasFieldErrors(result.fieldErrors)) toast.error(result.message);
       setState(result);
     });
@@ -60,8 +61,8 @@ export function EditChairModal({ chair, onClose, onUpdated, firmwares, companies
       onClose={close}
       size="sm"
       dismissible={!pending}
-      title="Editar cadeira"
-      description="A situação é alterada pelo botão de ativar/desativar na listagem."
+      title="Renomear cadeira"
+      description="MAC, endereço, firmware e ponto de acesso são cadastrados pela Physical."
       footer={
         <>
           <Button variant="ghost" size="sm" onClick={close} disabled={pending}>
@@ -69,36 +70,39 @@ export function EditChairModal({ chair, onClose, onUpdated, firmwares, companies
           </Button>
           <Button
             type="submit"
-            form="edit-chair-form"
+            form="rename-chair-form"
             size="sm"
             disabled={pending}
             trailingIcon={
               pending ? <Icon name="loader" className="h-4 w-4 animate-spin" /> : undefined
             }
           >
-            {pending ? "Salvando..." : "Salvar alterações"}
+            {pending ? "Salvando..." : "Salvar"}
           </Button>
         </>
       }
     >
       {chair && (
         <form
-          // A key troca junto com o registro: os campos remontam já com os
-          // dados de quem foi selecionado, sem arrastar o anterior.
           key={chair.id}
-          id="edit-chair-form"
+          id="rename-chair-form"
           onSubmit={handleSubmit}
           className="flex flex-col gap-5"
           noValidate
         >
           <input type="hidden" name="id" value={chair.id} />
 
-          <ChairFormFields
-            fieldErrors={fieldErrors}
+          <Input
+            name="name"
+            label="Nome da cadeira"
+            placeholder="Ex.: Sala de descanso 1"
+            autoComplete="off"
+            autoFocus
+            maxLength={100}
             disabled={pending}
-            chair={chair}
-            firmwares={firmwares}
-            companies={companies}
+            defaultValue={chair.name}
+            error={fieldErrors.name}
+            leadingIcon={<Icon name="chair" />}
           />
         </form>
       )}

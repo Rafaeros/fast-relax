@@ -2,6 +2,7 @@ package br.rafaeros.fastrelax_api.features.chairs;
 
 import java.time.Duration;
 import java.util.Map;
+import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,15 +18,24 @@ import org.springframework.web.client.RestClient;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import br.rafaeros.fastrelax_api.core.crypto.CryptoService;
 import br.rafaeros.fastrelax_api.features.chairs.ChairCommandResult.Outcome;
+import br.rafaeros.fastrelax_api.features.chairs.mqtt.ChairMqttGateway;
 
 /**
  * Único ponto de comunicação com o ESP32.
  *
  * <p>
  * Toda chamada ao hardware passa por aqui — timeout, autenticação e tratamento
- * de falha ficam em um lugar só. Quem orquestra sessão não sabe que existe HTTP,
- * e trocar para MQTT depois mexe apenas nesta classe.
+ * de falha ficam em um lugar só. Quem orquestra sessão não sabe qual transporte
+ * está em uso.
+ *
+ * <p>
+ * Com {@code app.mqtt.enabled=true}, todo comando vai pelo {@link ChairMqttGateway}
+ * em vez do HTTP abaixo — chave dura, sem mistura por cadeira: ou o parque
+ * inteiro fala MQTT, ou nenhuma cadeira fala. Desligado (padrão), o gateway
+ * nem existe como bean (ver {@code @ConditionalOnProperty} nele), e a injeção
+ * por {@code Optional} chega vazia — nada muda em relação ao que sempre foi.
  *
  * <p>
  * A resposta do dispositivo é traduzida em {@link ChairCommandResult} em vez de
@@ -39,17 +49,20 @@ public class ChairClient {
 
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
-    private final String deviceToken;
+    private final Optional<ChairMqttGateway> mqttGateway;
+    private final CryptoService cryptoService;
     private final int startDelaySeconds;
 
     public ChairClient(
             @Value("${app.chair.request-timeout-ms:3000}") int requestTimeoutMs,
-            @Value("${app.chair.device-token:}") String deviceToken,
             @Value("${app.chair.start-delay-seconds:5}") int startDelaySeconds,
-            ObjectMapper objectMapper) {
-        this.deviceToken = deviceToken;
+            ObjectMapper objectMapper,
+            Optional<ChairMqttGateway> mqttGateway,
+            CryptoService cryptoService) {
         this.startDelaySeconds = startDelaySeconds;
         this.objectMapper = objectMapper;
+        this.mqttGateway = mqttGateway;
+        this.cryptoService = cryptoService;
 
         // Timeout curto de propósito: o colaborador está esperando na frente da
         // cadeira, e uma requisição pendurada seria pior que um erro imediato.
@@ -65,6 +78,9 @@ public class ChairClient {
      * desliga sozinho mesmo que a rede caia ou o servidor reinicie.
      */
     public ChairCommandResult start(Chair chair, Long sessionId, int durationSeconds) {
+        if (mqttGateway.isPresent()) {
+            return mqttGateway.get().start(chair, sessionId, durationSeconds, startDelaySeconds);
+        }
         return send(chair, "/start", Map.of(
                 "sessionId", sessionId,
                 "durationSeconds", durationSeconds,
@@ -76,6 +92,9 @@ public class ChairClient {
      * cadeira já parada não é erro.
      */
     public ChairCommandResult stop(Chair chair, Long sessionId) {
+        if (mqttGateway.isPresent()) {
+            return mqttGateway.get().stop(chair, sessionId);
+        }
         return send(chair, "/stop", Map.of("sessionId", sessionId));
     }
 
@@ -88,6 +107,9 @@ public class ChairClient {
      * desliga sozinho ao fim da duração.
      */
     public ChairCommandResult testRelay(Chair chair, int durationSeconds) {
+        if (mqttGateway.isPresent()) {
+            return mqttGateway.get().testRelay(chair, durationSeconds);
+        }
         return send(chair, "/relay-test", Map.of("durationSeconds", durationSeconds));
     }
 
@@ -107,6 +129,9 @@ public class ChairClient {
      * @param bssid opcional; vazio deixa o ESP32 escolher o AP de melhor sinal
      */
     public ChairCommandResult pushNetwork(Chair chair, String ssid, String password, String bssid) {
+        if (mqttGateway.isPresent()) {
+            return mqttGateway.get().pushNetwork(chair, ssid, password, bssid);
+        }
         // O firmware distingue campo ausente de campo vazio: string vazia
         // significa "sem fixação de AP", e é o que apaga um BSSID configurado
         // antes. Mandar null faria o ESP32 manter o valor anterior.
@@ -114,6 +139,26 @@ public class ChairClient {
                 "ssid", ssid,
                 "password", password == null ? "" : password,
                 "bssid", bssid == null ? "" : bssid));
+    }
+
+    /**
+     * Grava host, porta, usuário e senha do broker MQTT na NVS do ESP32.
+     *
+     * <p>
+     * Espelha {@link #pushNetwork}: mesmo motivo de existir (substitui
+     * recompilar o firmware para trocar o broker de uma cadeira específica) e
+     * mesma ordem de resposta antes do efeito colateral — aqui não há troca de
+     * rede no meio, mas o padrão da API fica consistente com /network.
+     */
+    public ChairCommandResult pushMqtt(Chair chair, String host, int port, String username, String password) {
+        if (mqttGateway.isPresent()) {
+            return mqttGateway.get().pushMqtt(chair, host, port, username, password);
+        }
+        return send(chair, "/mqtt", Map.of(
+                "host", host,
+                "port", port,
+                "username", username == null ? "" : username,
+                "password", password == null ? "" : password));
     }
 
     /**
@@ -127,6 +172,9 @@ public class ChairClient {
      * {@code active} que volta na resposta.
      */
     public ChairCommandResult pushPower(Chair chair, boolean active) {
+        if (mqttGateway.isPresent()) {
+            return mqttGateway.get().pushPower(chair, active);
+        }
         return send(chair, "/power", Map.of("active", active));
     }
 
@@ -143,6 +191,12 @@ public class ChairClient {
             // WebServer do ESP32 lê o corpo pelo Content-Length — sem ele,
             // `server.arg("plain")` chega vazio e o firmware recusa o comando.
             String json = objectMapper.writeValueAsString(body);
+
+            // Token desta cadeira, não um segredo único: cada ESP32 gerou o
+            // próprio no primeiro boot e pareou com o backend no primeiro
+            // heartbeat. Vazio antes disso — o dispositivo recusa igual.
+            String deviceToken = chair.getDeviceTokenEncrypted() == null ? ""
+                    : cryptoService.decrypt(chair.getDeviceTokenEncrypted());
 
             ResponseEntity<String> response = restClient.post()
                     .uri(url)

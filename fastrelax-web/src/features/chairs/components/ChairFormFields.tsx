@@ -4,6 +4,7 @@ import { Icon, Input, Select } from "@/components/ui";
 import type {
   Chair,
   ChairFieldErrors,
+  CompanyOption,
   FirmwareOption,
 } from "@/features/chairs/types/chair.types";
 
@@ -15,6 +16,11 @@ export type ChairFormFieldsProps = {
   chair?: Chair;
   /** Versões do catálogo da Physical, para registrar o que está gravado. */
   firmwares?: FirmwareOption[];
+  /**
+   * Empresas para o select de dono do equipamento — aparece no cadastro e na
+   * edição completa (Physical pode reatribuir a cadeira a outro cliente).
+   */
+  companies?: CompanyOption[];
 };
 
 /**
@@ -28,6 +34,7 @@ export function ChairFormFields({
   disabled,
   chair,
   firmwares = [],
+  companies,
 }: ChairFormFieldsProps) {
   return (
     <>
@@ -43,6 +50,25 @@ export function ChairFormFields({
         error={fieldErrors.name}
         leadingIcon={<Icon name="chair" />}
       />
+
+      {companies && (
+        <Select
+          name="companyId"
+          label="Empresa"
+          defaultValue={chair?.companyId ? String(chair.companyId) : ""}
+          disabled={disabled}
+          error={fieldErrors.companyId}
+          hint={
+            chair
+              ? "Trocar aqui move a cadeira para outro cliente — ela some da lista de quem a tinha."
+              : "Só ela vai enxergar e operar esta cadeira."
+          }
+          options={[
+            { label: "Selecione a empresa", value: "" },
+            ...companies.map((company) => ({ label: company.name, value: String(company.id) })),
+          ]}
+        />
+      )}
 
       <Input
         name="macAddress"
@@ -107,6 +133,64 @@ export function ChairFormFields({
         error={fieldErrors.wifiBssid}
         leadingIcon={<Icon name="wrench" />}
       />
+
+      {/*
+        Override raro: a maioria das cadeiras nunca precisa sair do broker
+        padrão (mesmo host/usuário/senha que já vem embutido em config.h). Em
+        branco no host apaga qualquer override e volta a valer o padrão
+        global — mesmo critério do BSSID acima.
+      */}
+      <div className="grid gap-5 sm:grid-cols-[1fr_140px]">
+        <Input
+          name="mqttHost"
+          label="Broker MQTT (opcional)"
+          placeholder="Em branco usa o broker padrão"
+          autoComplete="off"
+          maxLength={255}
+          disabled={disabled}
+          defaultValue={chair?.mqttHost ?? ""}
+          hint="Só preencha se esta cadeira específica precisar de outro broker."
+          error={fieldErrors.mqttHost}
+          leadingIcon={<Icon name="wrench" />}
+        />
+
+        <Input
+          name="mqttPort"
+          label="Porta"
+          type="number"
+          min={1}
+          max={65535}
+          placeholder="1883"
+          autoComplete="off"
+          disabled={disabled}
+          defaultValue={chair?.mqttPort ?? ""}
+          error={fieldErrors.mqttPort}
+        />
+      </div>
+
+      <div className="grid gap-5 sm:grid-cols-2">
+        <Input
+          name="mqttUsername"
+          label="Usuário do broker"
+          placeholder="Opcional"
+          autoComplete="off"
+          maxLength={100}
+          disabled={disabled}
+          defaultValue={chair?.mqttUsername ?? ""}
+          error={fieldErrors.mqttUsername}
+        />
+
+        <Input
+          name="mqttPassword"
+          label="Senha do broker"
+          type="password"
+          placeholder={chair?.mqttHost ? "Deixe em branco para manter a atual" : "Opcional"}
+          autoComplete="new-password"
+          disabled={disabled}
+          hint="Nunca é exibida de volta — em branco mantém a senha já gravada."
+          error={fieldErrors.mqttPassword}
+        />
+      </div>
 
       <Select
         name="firmwareId"

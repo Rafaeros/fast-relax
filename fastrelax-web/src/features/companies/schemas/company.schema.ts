@@ -2,11 +2,17 @@ import { onlyDigits } from "@/lib/format";
 import type {
   CompanyFieldErrors,
   SaveCompanyInput,
+  SaveWifiInput,
+  WifiFieldErrors,
 } from "@/features/companies/types/company.types";
 
 export type CompanyValidation =
   | { valid: true; data: SaveCompanyInput }
   | { valid: false; fieldErrors: CompanyFieldErrors };
+
+export type WifiValidation =
+  | { valid: true; data: SaveWifiInput }
+  | { valid: false; fieldErrors: WifiFieldErrors };
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
@@ -23,8 +29,6 @@ export function validateCompanyInput(input: {
   street: string;
   number: string;
   complement: string;
-  wifiSsid: string;
-  wifiPassword: string;
 }): CompanyValidation {
   const cnpj = onlyDigits(input.cnpj);
   // Vazio é válido: sem slug digitado, o backend deriva da razão social.
@@ -37,10 +41,6 @@ export function validateCompanyInput(input: {
   const numberValue = input.number.trim();
   const complement = input.complement.trim();
   const cityId = Number(input.cityId);
-  const wifiSsid = input.wifiSsid.trim();
-  // A senha não é aparada: espaço é caractere válido em senha de Wi-Fi, e
-  // aparar aqui gravaria no ESP32 algo diferente do que o AP espera.
-  const wifiPassword = input.wifiPassword;
 
   const fieldErrors: CompanyFieldErrors = {};
 
@@ -87,6 +87,44 @@ export function validateCompanyInput(input: {
     fieldErrors.number = "Informe o número.";
   }
 
+  if (Object.keys(fieldErrors).length > 0) {
+    return { valid: false, fieldErrors };
+  }
+
+  return {
+    valid: true,
+    data: {
+      cnpj,
+      slug: slug || undefined,
+      name,
+      email,
+      phone,
+      address: {
+        cityId,
+        cep,
+        street,
+        number: numberValue,
+        complement: complement || undefined,
+      },
+    },
+  };
+}
+
+/**
+ * Rede das cadeiras — autoatendimento do RH/gestor. Mesmas regras de
+ * `SaveWifiRequestDTO`.
+ */
+export function validateWifiInput(input: {
+  wifiSsid: string;
+  wifiPassword: string;
+}): WifiValidation {
+  const wifiSsid = input.wifiSsid.trim();
+  // A senha não é aparada: espaço é caractere válido em senha de Wi-Fi, e
+  // aparar aqui gravaria no ESP32 algo diferente do que o AP espera.
+  const wifiPassword = input.wifiPassword;
+
+  const fieldErrors: WifiFieldErrors = {};
+
   if (wifiSsid.length > 64) {
     fieldErrors.wifiSsid = "O SSID deve ter no máximo 64 caracteres.";
   }
@@ -108,24 +146,27 @@ export function validateCompanyInput(input: {
   return {
     valid: true,
     data: {
-      cnpj,
-      slug: slug || undefined,
-      name,
-      email,
-      phone,
-      address: {
-        cityId,
-        cep,
-        street,
-        number: numberValue,
-        complement: complement || undefined,
-      },
       wifiSsid,
       // Senha em branco não é "apagar": o backend lê ausência como "manter a
       // atual". Quem quiser tirar a rede limpa o SSID, e a senha cai junto.
       wifiPassword: wifiPassword || undefined,
     },
   };
+}
+
+/** Converte os erros do backend (`"campo: mensagem"`) do endpoint de Wi-Fi. */
+export function mapWifiApiErrors(errors: string[]): WifiFieldErrors {
+  const fieldErrors: WifiFieldErrors = {};
+
+  for (const entry of errors) {
+    const [field, ...rest] = entry.split(":");
+    const message = rest.join(":").trim();
+    if (message && field.trim() === "wifiSsid") {
+      fieldErrors.wifiSsid = message;
+    }
+  }
+
+  return fieldErrors;
 }
 
 /**
@@ -168,7 +209,6 @@ export function mapCompanyApiErrors(errors: string[]): CompanyFieldErrors {
     "cep",
     "street",
     "number",
-    "wifiSsid",
   ];
 
   for (const entry of errors) {

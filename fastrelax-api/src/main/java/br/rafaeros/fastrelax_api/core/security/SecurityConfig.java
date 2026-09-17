@@ -25,7 +25,6 @@ import lombok.RequiredArgsConstructor;
 public class SecurityConfig {
 
     private final SecurityFilter securityFilter;
-    private final DeviceTokenFilter deviceTokenFilter;
     private final TenantContextFilter tenantContextFilter;
     private final PasswordChangeRequiredFilter passwordChangeRequiredFilter;
     private final UrlBasedCorsConfigurationSource corsConfigurationSource;
@@ -49,23 +48,34 @@ public class SecurityConfig {
                 // actuator continuam exigindo autenticação.
                 .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
                 .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
-                // Autenticado pelo DeviceTokenFilter, não por JWT: o ESP32 não faz login.
+                // O Spring Security 6 volta a securizar o forward interno para /error
+                // (mudou do 5.x). Sem isto, uma negativa de acesso na requisição
+                // original vira DOIS 403 — o de verdade, e outro genérico do
+                // Http403ForbiddenEntryPoint ao tentar renderizar o /error do
+                // primeiro, mascarando o motivo real na resposta.
+                .requestMatchers("/error").permitAll()
+                // Sem JWT: o ESP32 não faz login. Autenticado dentro do próprio
+                // ChairService#registerHeartbeat, pelo token pareado da cadeira —
+                // não dá pra checar isso num filtro global porque o MAC (e portanto
+                // o token esperado) só se sabe depois de ler o corpo da requisição.
                 .requestMatchers(HttpMethod.POST, "/chairs/heartbeat").permitAll()
                 // Cadastro de empresas e catálogo de firmware são da equipe da
                 // plataforma. As demais rotas resolvem o papel no @PreAuthorize,
                 // que é onde a regra fica junto do caso de uso.
                 //
-                // /companies/me é a exceção: RH/admin do cliente lendo a própria
-                // empresa. Precisa vir antes do bloqueio geral — a primeira regra
-                // que casar decide, e "/companies/**" casaria primeiro.
+                // /companies/me[/**] é a exceção: RH/admin do cliente lendo e
+                // autoatendendo a própria empresa (inclui .../me/wifi). Precisa vir
+                // antes do bloqueio geral — a primeira regra que casar decide, e
+                // "/companies/**" casaria primeiro e barraria antes do @PreAuthorize
+                // de operatesCompany() no controller sequer rodar.
                 .requestMatchers(HttpMethod.GET, "/companies/me").authenticated()
+                .requestMatchers(HttpMethod.PATCH, "/companies/me/**").authenticated()
                 .requestMatchers("/companies/**").hasRole("SYSADMIN")
                 .requestMatchers(HttpMethod.POST, "/firmwares/**").hasRole("SYSADMIN")
                 .requestMatchers(HttpMethod.PUT, "/firmwares/**").hasRole("SYSADMIN")
                 .requestMatchers(HttpMethod.DELETE, "/firmwares/**").hasRole("SYSADMIN")
                 .anyRequest().authenticated()
             )
-            .addFilterBefore(deviceTokenFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(securityFilter, UsernamePasswordAuthenticationFilter.class)
             // Depois do SecurityFilter, que é quem coloca o principal no contexto:
             // é dele que sai a empresa da requisição.

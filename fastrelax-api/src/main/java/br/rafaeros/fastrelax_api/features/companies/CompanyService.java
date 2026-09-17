@@ -17,6 +17,7 @@ import br.rafaeros.fastrelax_api.core.util.SlugUtils;
 import br.rafaeros.fastrelax_api.features.companies.dtos.CompanyResponseDTO;
 import br.rafaeros.fastrelax_api.features.companies.dtos.SaveAddressRequestDTO;
 import br.rafaeros.fastrelax_api.features.companies.dtos.SaveCompanyRequestDTO;
+import br.rafaeros.fastrelax_api.features.companies.dtos.SaveWifiRequestDTO;
 import br.rafaeros.fastrelax_api.features.locations.Address;
 import br.rafaeros.fastrelax_api.features.locations.AddressRepository;
 import br.rafaeros.fastrelax_api.features.locations.CityRepository;
@@ -42,12 +43,15 @@ public class CompanyService {
     private final CryptoService cryptoService;
     private final CurrentTenant currentTenant;
 
+    /** Listagem da Physical: sem o SSID, que é autoatendimento da empresa. */
     public Page<CompanyResponseDTO> findAll(@org.springframework.lang.NonNull Pageable pageable) {
-        return companyRepository.findAll(Objects.requireNonNull(pageable)).map(CompanyResponseDTO::new);
+        return companyRepository.findAll(Objects.requireNonNull(pageable))
+                .map(company -> new CompanyResponseDTO(company, false));
     }
 
+    /** Mesma regra da listagem: a Physical não enxerga o SSID da empresa. */
     public CompanyResponseDTO findById(Long id) {
-        return new CompanyResponseDTO(findEntityById(id));
+        return new CompanyResponseDTO(findEntityById(id), false);
     }
 
     /** A própria empresa de quem está logado — o que a tela "Minha empresa" do RH mostra. */
@@ -78,7 +82,7 @@ public class CompanyService {
         Company saved = companyRepository.save(company);
         settingsRepository.save(new CompanySessionSettings(saved));
 
-        return new CompanyResponseDTO(saved);
+        return new CompanyResponseDTO(saved, false);
     }
 
     @Transactional
@@ -96,6 +100,20 @@ public class CompanyService {
         buildAddress(company.getAddress(), dto.address());
         applyFields(company, dto);
 
+        return new CompanyResponseDTO(companyRepository.save(company), false);
+    }
+
+    /**
+     * Rede das cadeiras, cadastrada pela própria empresa (RH/gestor).
+     *
+     * <p>
+     * A Physical não passa por aqui: ela aplica a rede ao dispositivo pelo push
+     * de {@code ChairNetworkService}, sem nunca ver SSID ou senha.
+     */
+    @Transactional
+    public CompanyResponseDTO updateMyWifi(SaveWifiRequestDTO dto) {
+        Company company = currentTenant.load();
+        applyWifi(company, dto.wifiSsid(), dto.wifiPassword());
         return new CompanyResponseDTO(companyRepository.save(company));
     }
 
@@ -158,7 +176,7 @@ public class CompanyService {
     public CompanyResponseDTO toggleActive(Long id) {
         Company company = findEntityById(id);
         company.setActive(!company.isActive());
-        return new CompanyResponseDTO(companyRepository.save(company));
+        return new CompanyResponseDTO(companyRepository.save(company), false);
     }
 
     @Transactional
@@ -173,7 +191,6 @@ public class CompanyService {
         company.setName(dto.name());
         company.setEmail(dto.email());
         company.setPhone(PhoneUtils.normalize(dto.phone()));
-        applyWifi(company, dto);
     }
 
     /**
@@ -181,16 +198,16 @@ public class CompanyService {
      *
      * <p>
      * A senha em branco mantém a atual: é assim que se edita o cadastro sem
-     * redigitar a senha da rede do cliente — que, aliás, ninguém consegue ler
-     * de volta da API para conferir.
+     * redigitar a senha da rede — que, aliás, ninguém consegue ler de volta da
+     * API para conferir, nem a própria empresa depois de gravada.
      *
      * <p>
      * Cifrada com o mesmo AES-GCM do CPF, e pelo mesmo motivo: é segredo de
      * terceiro guardado por nós.
      */
-    private void applyWifi(Company company, SaveCompanyRequestDTO dto) {
-        String ssid = dto.wifiSsid() == null ? "" : dto.wifiSsid().trim();
-        String password = dto.wifiPassword() == null ? "" : dto.wifiPassword();
+    private void applyWifi(Company company, String wifiSsid, String wifiPassword) {
+        String ssid = wifiSsid == null ? "" : wifiSsid.trim();
+        String password = wifiPassword == null ? "" : wifiPassword;
 
         boolean changed = false;
 

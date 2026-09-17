@@ -174,50 +174,6 @@ export function CompanyFormFields({
         applyAddress={applyAddress}
         resolvingCity={resolvingCity}
       />
-
-      <div className="mt-1 border-t border-line pt-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-ink-muted">
-          Rede das cadeiras
-        </p>
-        <p className="mt-1 text-xs text-ink-muted">
-          Gravada na memória do ESP32 pela ação &ldquo;Enviar configuração de
-          rede&rdquo;, na lista de cadeiras. O BSSID fica em cada cadeira, para
-          fixar o ponto de acesso quando houver mais de um.
-        </p>
-      </div>
-
-      <Input
-        name="wifiSsid"
-        label="SSID"
-        placeholder="Nome da rede Wi-Fi"
-        maxLength={64}
-        disabled={disabled}
-        defaultValue={company?.wifiSsid ?? ""}
-        hint="Limpar o SSID apaga também a senha guardada."
-        error={fieldErrors.wifiSsid}
-        leadingIcon={<Icon name="wrench" />}
-      />
-
-      <Input
-        name="wifiPassword"
-        type="password"
-        label="Senha do Wi-Fi"
-        // Sem `defaultValue`: a senha não volta da API por decisão de projeto,
-        // e preencher com asteriscos falsos faria o campo mentir sobre o que
-        // será enviado.
-        placeholder={
-          company?.wifiConfigured ? "Senha guardada — deixe em branco para manter" : "Senha da rede"
-        }
-        maxLength={128}
-        autoComplete="new-password"
-        disabled={disabled}
-        hint={
-          company?.wifiConfigured
-            ? "Preencha só para trocar a senha. Em branco, a atual é mantida."
-            : "Fica cifrada no banco e só sai daqui para o ESP32."
-        }
-        leadingIcon={<Icon name="lock" />}
-      />
     </>
   );
 }

@@ -51,7 +51,18 @@ public record ChairResponseDTO(
     /** Quanto falta da estabilização; 0 quando a cadeira já está livre. */
     long cooldownSecondsRemaining,
     LocalDateTime lastSeenAt,
-    LocalDateTime createdAt
+    LocalDateTime createdAt,
+    /**
+     * Broker MQTT sobrescrito para esta cadeira; nulo usa o padrão global. A
+     * senha nunca aparece aqui — mesmo critério do token de dispositivo e da
+     * senha de Wi-Fi, nada que dê acesso ao broker passa por uma rota que ecoa
+     * em log de proxy ou console do navegador.
+     */
+    String mqttHost,
+    Integer mqttPort,
+    String mqttUsername,
+    /** Quando o ESP32 confirmou ter gravado a configuração de MQTT. */
+    LocalDateTime mqttSyncedAt
 ) {
     public ChairResponseDTO(Chair chair, int offlineAfterSeconds) {
         this(chair.getId(), chair.getName(), chair.getMacAddress(), chair.getIpAddress(),
@@ -65,6 +76,7 @@ public record ChairResponseDTO(
                 chair.getReportedSsid(),
                 chair.isOnConfiguredNetwork(),
                 chair.isActive(), chair.isOnline(offlineAfterSeconds), chair.isCoolingDown(),
-                chair.cooldownSecondsRemaining(), chair.getLastSeenAt(), chair.getCreatedAt());
+                chair.cooldownSecondsRemaining(), chair.getLastSeenAt(), chair.getCreatedAt(),
+                chair.getMqttHost(), chair.getMqttPort(), chair.getMqttUsername(), chair.getMqttSyncedAt());
     }
 }

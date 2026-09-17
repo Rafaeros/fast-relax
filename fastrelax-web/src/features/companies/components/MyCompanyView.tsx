@@ -10,6 +10,7 @@ import {
 } from "@/components/ui";
 import type { DetailItem } from "@/components/ui";
 import { formatCep, formatCnpj, formatPhone } from "@/lib/format";
+import { CompanyWifiForm } from "@/features/companies/components/CompanyWifiForm";
 import type { Company } from "@/features/companies/types/company.types";
 
 export type MyCompanyViewProps = {
@@ -71,6 +72,8 @@ export function MyCompanyView({ company, error }: MyCompanyViewProps) {
           <DetailList items={items} className="mt-2" />
         </CardBody>
       </Card>
+
+      <CompanyWifiForm company={company} />
     </div>
   );
 }

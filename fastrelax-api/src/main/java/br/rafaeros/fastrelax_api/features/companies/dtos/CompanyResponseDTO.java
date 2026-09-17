@@ -37,7 +37,18 @@ public record CompanyResponseDTO(
     LocalDateTime wifiUpdatedAt,
     LocalDateTime createdAt
 ) {
+    /** Visão completa, incluindo o SSID — para a própria empresa (RH/gestor). */
     public CompanyResponseDTO(Company entity) {
+        this(entity, true);
+    }
+
+    /**
+     * @param revealWifiSsid falso esconde o SSID da resposta. É o que o painel
+     *                        da Physical usa: ela aplica a rede ao dispositivo
+     *                        pelo push, mas não cadastra nem enxerga o valor —
+     *                        quem o configura é a própria empresa.
+     */
+    public CompanyResponseDTO(Company entity, boolean revealWifiSsid) {
         this(entity.getId(), entity.getCnpj(), entity.getSlug(), entity.getName(), entity.getEmail(), entity.getPhone(),
                 entity.isActive(),
                 id(entity.getAddress()),
@@ -48,7 +59,7 @@ public record CompanyResponseDTO(
                 cityId(entity.getAddress()),
                 cityName(entity.getAddress()),
                 stateAcronym(entity.getAddress()),
-                entity.getWifiSsid(),
+                revealWifiSsid ? entity.getWifiSsid() : null,
                 entity.hasWifi(),
                 entity.getWifiUpdatedAt(),
                 entity.getCreatedAt());

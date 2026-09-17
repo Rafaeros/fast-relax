@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 import br.rafaeros.fastrelax_api.core.dto.ApiResponseDTO;
 import br.rafaeros.fastrelax_api.features.companies.dtos.CompanyResponseDTO;
 import br.rafaeros.fastrelax_api.features.companies.dtos.SaveCompanyRequestDTO;
+import br.rafaeros.fastrelax_api.features.companies.dtos.SaveWifiRequestDTO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -48,6 +49,20 @@ public class CompanyController {
     @Operation(summary = "Dados da própria empresa, incluindo o slug de login")
     public ResponseEntity<ApiResponseDTO<CompanyResponseDTO>> getMine() {
         return ResponseEntity.ok(ApiResponseDTO.success(companyService.findMine(), "Empresa encontrada"));
+    }
+
+    /**
+     * Autoatendimento: a empresa cadastra a própria rede de cadeiras. A Physical
+     * não passa por aqui — ela só aplica a rede ao dispositivo pelo push de
+     * {@code /chairs/{id}/network}, sem ver SSID nem senha.
+     */
+    @PatchMapping("/me/wifi")
+    @PreAuthorize("@access.operatesCompany()")
+    @Operation(summary = "Cadastra o SSID e a senha da rede das cadeiras da própria empresa")
+    public ResponseEntity<ApiResponseDTO<CompanyResponseDTO>> updateMyWifi(
+            @RequestBody @Valid SaveWifiRequestDTO dto) {
+        return ResponseEntity.ok(ApiResponseDTO.success(companyService.updateMyWifi(dto),
+                "Rede Wi-Fi atualizada com sucesso"));
     }
 
     @GetMapping
